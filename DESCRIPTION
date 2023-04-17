@@ -1,0 +1,50 @@
+Package: GAMclust
+Title: GAM-clustering: Metabolic Modules Derivig From RNAseq Data
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Anastasiia",
+           family = "Gainullina",
+           role = c("aut", "cre"),
+           email = "anastasiia.gainullina@gmail.com",
+           comment = c(ORCID = "0000-0003-3796-2337"))
+    person(given = "Alexey",
+           family = "Sergushichev",
+           role = "aut",
+           email = "alsergbox@gmail.com",
+           comment = c(ORCID = "0000-0003-1159-7220"))
+Description: The GAM-clustering method reveals metabolic variability within dataset using a novel 
+    network-based computational approach. This method utilizes cellular transcriptional profiles as 
+    proxies. The metabolic network of reactions is presented as a graph. This graph has vertices 
+    corresponding to metabolites and the edges corresponding to the reactions with the expressed genes. 
+    In the graph the method tries to find a set of connected subgraphs. Genes of each connected subgraph 
+    have highly correlated expression pattern.
+Depends: 
+    R (>= 3.5),
+    data.table
+Imports:
+    Biobase,
+    cluster,
+    cowplot,
+    data.table,
+    dplyr,
+    fgsea,
+    gatom,
+    ggplot2,
+    igraph,
+    limma,
+    mwcsr,
+    irlba,
+    pheatmap
+Suggests:
+    AnnotationDbi,
+    org.Mm.eg.db,
+    reactome.db,
+    KEGGREST,
+    Seurat
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
+VignetteBuilder: knitr
+URL: https://github.com/.../GAMclust
+BugReports: https://github.com/.../GAMclust/issues

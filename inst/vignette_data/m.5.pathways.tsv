@@ -1,0 +1,3 @@
+pathway	pval	padj	overlap	size	overlapGenes
+R-MMU-191273: Cholesterol biosynthesis	4.53542284281483e-61	6.80766968706505e-58	17	26	Fdps Acat2 Cyp51 Fdft1 Hmgcr Hsd17b7 Lss Mvk Nsdhl Mvd Sqle Hmgcs1 Idi1 Msmo1 Pmvk Tm7sf2 Dhcr24
+mmu00650: Butanoate metabolism	4.15970800317399e-08	8.91960244680593e-06	3	28	Acat2 Hmgcs1 Aacs

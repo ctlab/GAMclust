@@ -1,0 +1,401 @@
+#' Function for batch solving SGMWCS problems
+#'
+#' @param mwcs_solver SGMWCS solver from mwcsr package
+#' @export
+seq_batch_solver <- function(mwcs_solver) {
+  function(instances) { lapply(instances, mwcsr::solve_mwcsp, solver=mwcs_solver) }
+}
+
+
+getCenter <- function(gene.exprs,
+                      cluster.genes=seq_len(nrow(gene.exprs)),
+                      cluster.genes.neg=c(),
+                      method=c("pearson", "spearman")) {
+
+  method <- match.arg(method)
+
+  cluster.exprs <- rbind(
+    gene.exprs[cluster.genes,, drop=F],
+    -gene.exprs[cluster.genes.neg,, drop=F])
+
+  if (method == "spearman") {
+    cluster.exprs <- t(apply(cluster.exprs, 1, rank))
+  }
+
+  # cluster.exprs.znorm <- zScore(cluster.exprs)
+  # center <- apply(cluster.exprs.znorm, 2, mean, na.rm=T)
+
+  center <- apply(cluster.exprs, 2, mean, na.rm=T)
+  # center <- center / sd(center, na.rm = T) # ???
+  center[!is.finite(center)] <- NA
+  center
+}
+
+dualGraph <- function(m, what) {
+  t1 <- data.table::as.data.table(igraph::as_data_frame(m)[, c("from", "to", what)])
+  t2 <- data.table::copy(t1)
+
+  data.table::setnames(t2, c("from", "to"), c("to", "from"))
+  tt <- unique(rbind(t1, t2)[, c("from", what), with = FALSE])
+  tt.g <- unique(merge(tt, tt, by="from", allow.cartesian = TRUE)
+                 [, c(paste0(what, ".x"),
+                      paste0(what, ".y")),
+                   with = FALSE])
+  dm <- igraph::graph_from_data_frame(d=tt.g, directed = FALSE)
+  dm
+}
+
+doGeseca <- function(E.prep,
+                     network.prep,
+                     network.annotation,
+                     modules,
+                     scale = FALSE,
+                     center = FALSE,
+                     verbose = TRUE) {
+  
+  E.prep_filtered <- E.prep[rownames(E.prep) %in% network.prep$gene, , drop = F]
+
+  modules_path <- setNames(
+    lapply(modules, function(cm) {igraph::E(cm)$gene}), 
+    paste0("c.pos", seq_along(modules)))
+  
+  gesecaRes <- geseca(pathways = modules_path, 
+                      E = E.prep_filtered, 
+                      scale = scale,
+                      center = center)
+  
+  if(verbose){
+    messagef(">> geseca padjs were in range: %s", paste(round(range(gesecaRes$padj), 5), collapse = "-"))}
+  
+  gesecaRes
+}
+
+ulength <- pryr::compose(length, unique)
+
+zScore <- function(x) {
+  x.means <- apply(x, 1, mean, na.rm=T)
+  x.sds <- apply(x, 1, sd, na.rm=T)
+  res <- sweep(sweep(x, 1, x.means), 1, x.sds, "/")
+  return(res)
+}
+
+normalize.rows <- function(x) {
+  x <- sweep(x, 1, apply(x, 1, min, na.rm=TRUE))
+  sweep(x, 1, apply(x, 1, max, na.rm=TRUE), "/")
+}
+
+messagef <- function(...) {
+  message(sprintf(...))
+}
+
+write.tsv <- function(table, dir, file=NULL, gzip=FALSE, row.names=NA, col.names=NA, ...) {
+  name <- deparse(substitute(table))
+  table <- as.data.frame(table)
+
+  if (is.null(file)) {
+    file <- file.path(dir, paste0(name, ".tsv", if (gzip) ".gz"))
+  }
+
+  if (is.na(row.names)) {
+    row.names <- is.character(attr(table, "row.names"))
+  }
+
+  if (!row.names && is.na(col.names)) {
+    col.names=T
+  }
+
+  for (c in colnames(table)) {
+    if (is.character(table[[c]])) {
+      table[[c]] <- sub("#", "", table[[c]])
+    }
+  }
+
+  if (gzip) {
+    file <- gzfile(file, "w")
+  }
+  write.table(table, file, quote=F,
+              row.names=row.names, col.names=col.names, sep="\t")
+  if (gzip) {
+    close(file)
+  }
+}
+
+read.tsv <- function(file, header=T, sep="\t", quote="", comment.char="", check.names=FALSE, ...) {
+  args <- list(...)
+  res <- read.table(file, header=header, sep=sep, quote=quote,
+                    comment.char=comment.char, check.names=check.names,
+                    stringsAsFactors=FALSE,
+                    ...)
+  if ((!"row.names" %in% names(args)) && (colnames(res)[1] == "")) {
+    rownames(res) <- res[, 1]
+    res[[1]] <- NULL
+  }
+  res
+}
+
+# Get names with number of genes in modules
+getNamesWithLength <- function(dir, files, use.genes.with.pos.score.only=FALSE) {
+
+  n_genes <- sapply(files, function(f) {
+
+    len_m <- read.tsv(file.path(dir, f))
+    if (use.genes.with.pos.score.only) {
+      len_m <- len_m[which(len_m$score > 0), ]
+    }
+
+    len_m <- nrow(len_m)
+    m <- sub(".genes.tsv", paste0("(", len_m, ")"), f)
+  })
+
+  return(n_genes)
+}
+
+# Number of intersected genes
+compareModules <- function(dir1, dir2,
+                           use.genes.with.pos.score.only=FALSE,
+                           file.name="modules_similarity_intersection.png") {
+
+  one.files <- list.files(dir1)
+  one.files <- grep(one.files, pattern = "m.\\d+.genes.tsv", value = TRUE)
+  two.files <- list.files(dir2)
+  two.files <- grep(two.files, pattern = "m.\\d+.genes.tsv", value = TRUE)
+
+  compare.df <- data.frame(matrix(nrow = length(one.files),
+                                  ncol = length(two.files)))
+  rownames(compare.df) <- getNamesWithLength(dir1, one.files, use.genes.with.pos.score.only)
+  colnames(compare.df) <- getNamesWithLength(dir2, two.files, use.genes.with.pos.score.only)
+
+  for (i in seq_along(one.files)) {
+    # list of genes from dir1
+    one.genes <- read.tsv(file.path(dir1, one.files[i]))
+    if (use.genes.with.pos.score.only) {
+      one.genes <- one.genes[which(one.genes$score > 0), ]
+    }
+
+    for (j in seq_along(two.files)) {
+      # list of genes from dir2
+      two.genes <- read.tsv(file.path(dir2, two.files[j]))
+      if (use.genes.with.pos.score.only) {
+        two.genes <- two.genes[which(two.genes$score > 0), ]
+      }
+
+      # intersection
+      both.entrez <- length(intersect(one.genes$Entrez, two.genes$Entrez))
+      compare.df[i, j] <- both.entrez
+    }
+  }
+
+  # sort columns and rows
+  compare.df <- compare.df[
+    rownames(compare.df)[
+      order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", rownames(compare.df))))],
+    colnames(compare.df)[
+      order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", colnames(compare.df))))],
+    drop = F]
+
+  if (any(dim(compare.df) == 1)) {
+    compare.df.norm <- compare.df
+  } else {
+    compare.df.norm <- normalize.rows(compare.df) # 04.04.2022 Zhenya
+    compare.df.norm[is.na(compare.df.norm)] <- 0  # 04.04.2022 Zhenya
+  }
+
+  # save heatmap
+  pheatmap::pheatmap(
+    compare.df.norm,  # 04.04.2022 Zhenya
+    filename = file.name,
+    cluster_rows=F, cluster_cols=F,
+    angle_col = 315,
+    display_numbers = compare.df, # 04.04.2022 Zhenya
+    number_format = "%.f",
+    fontsize_number = 16,
+    fontsize_col = 18,
+    fontsize_row = 18,
+    width=8, height=5,
+    show_rownames=T, show_colnames=T,
+    main = paste0('Intersection',
+                  ifelse(use.genes.with.pos.score.only, ": pos.genes", "")))
+}
+
+# Correlation between patterns (for same data)
+compareModulesCor <- function(patterns.dir1, patterns.dir2,
+                              file.name="modules_similarity_correlation.png") {
+
+  one.patterns <- read.tsv(patterns.dir1)
+  two.patterns <- read.tsv(patterns.dir2)
+  two.patterns <- two.patterns[, colnames(one.patterns)]
+
+  compare.df <- data.frame(matrix(nrow = nrow(one.patterns),
+                                  ncol = nrow(two.patterns)))
+
+  rownames(compare.df) <- paste("m.", seq(1:nrow(one.patterns)), sep="")
+  colnames(compare.df) <- paste("m.", seq(1:nrow(two.patterns)), sep="")
+
+  for (i in 1:nrow(one.patterns)) {
+    # pattern from 1
+    pattern1 <- as.numeric(one.patterns[i, ])
+
+    for (j in 1:nrow(two.patterns)) {
+      # pattern from 2
+      pattern2 <- as.numeric(two.patterns[j,])
+
+      patterns.cor <- cor(pattern1, pattern2, method = "spearman")
+
+      # write fraction to the df
+      compare.df[i, j] <- patterns.cor
+    }
+  }
+
+  # sort columns and rows
+  compare.df <- compare.df[
+    rownames(compare.df)[
+      order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", rownames(compare.df))))],
+    colnames(compare.df)[
+      order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", colnames(compare.df))))]]
+
+  # save heatmap
+  pheatmap::pheatmap(
+    compare.df,
+    filename = file.name,
+    cluster_rows=F, cluster_cols=F,
+    angle_col = 315,
+    display_numbers = T,
+    fontsize_number = 16,
+    fontsize_col = 18,
+    fontsize_row = 18,
+    width=8, height=5,
+    show_rownames=T, show_colnames=T,
+    main = paste0('Correlation of patterns',
+                  ifelse(substr(patterns.dir1,
+                                nchar(patterns.dir1) - 6,
+                                nchar(patterns.dir1)) == "pos.tsv",
+                         ": pos.genes", "")))
+}
+
+# Tversky index: Jaccard index / Sorensen-Dice coefficient
+compareModulesIndex <- function(dir1, dir2,
+                                jaccard=TRUE,
+                                use.genes.with.pos.score.only=FALSE,
+                                file.name="modules_similarity_index.png") {
+
+  one.files <- list.files(dir1)
+  one.files <- grep(one.files, pattern = "m.\\d+.genes.tsv", value = TRUE)
+  two.files <- list.files(dir2)
+  two.files <- grep(two.files, pattern = "m.\\d+.genes.tsv", value = TRUE)
+
+  compare.df <- data.frame(matrix(nrow = length(one.files),
+                                  ncol = length(two.files)))
+  rownames(compare.df) <- getNamesWithLength(dir1, one.files, use.genes.with.pos.score.only)
+  colnames(compare.df) <- getNamesWithLength(dir2, two.files, use.genes.with.pos.score.only)
+
+  for (i in seq_along(one.files)) {
+    # list of genes from dir1
+    one.genes <- read.tsv(file.path(dir1, one.files[i]))
+    if (use.genes.with.pos.score.only) {
+      one.genes <- one.genes[which(one.genes$score > 0), ]
+    }
+
+    for (j in seq_along(two.files)) {
+      # list of genes from dir2
+      two.genes <- read.tsv(file.path(dir2, two.files[j]))
+      if (use.genes.with.pos.score.only) {
+        two.genes <- two.genes[which(two.genes$score > 0), ]
+      }
+
+      # intersection and set differences
+      ab.intersection <- length(intersect(one.genes$Entrez, two.genes$Entrez))
+      ab.diff <- length(setdiff(one.genes, two.genes))
+      ba.diff <- length(setdiff(two.genes, one.genes))
+
+      ab.coef <- ifelse(jaccard, 1, 0.5)
+
+      # index
+      index <- ab.intersection / (ab.intersection + ab.coef*ab.diff + ab.coef*ba.diff)
+      # write fraction to the df
+      compare.df[i, j] <- index
+    }
+  }
+
+  # sort columns
+  compare.df <- compare.df[rownames(compare.df)[
+    order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", rownames(compare.df))))],
+    colnames(compare.df)[
+      order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", colnames(compare.df))))]]
+
+  # save heatmap
+  pheatmap::pheatmap(
+    compare.df,
+    filename = file.name,
+    cluster_rows=F, cluster_cols=F,
+    angle_col = 315,
+    display_numbers = T,
+    fontsize_number = 16,
+    fontsize_col = 18,
+    fontsize_row = 18,
+    width=8, height=5,
+    show_rownames=T, show_colnames=T,
+    # main = sprintf("Rows: %s / Columns: %s", rows.name, cols.name)
+    main = paste0(
+      ifelse(jaccard, 'Jaccard index', 'Sorensen-Dice index'),
+      ifelse(use.genes.with.pos.score.only, ": pos.genes", "")))
+}
+
+
+#' Rename atoms (to human readable format)
+#'
+#' @param g Input graph
+#' @param network Metabolic network with slot `atoms` containing information on
+#' *metabolite* and *element*
+#' @param metabolites.annotation Metabolites annotation.
+#' @return Graph with renamed atoms (original naming can be found as vertices attribute named *atom*)
+#' @export
+renameAtoms <- function(g, network, metabolites.annotation) {
+
+  igraph::V(g)$name_met <- network$atoms[igraph::V(g)$name]$metabolite
+  igraph::V(g)$element <- network$atoms[igraph::V(g)$name]$element
+  # human-friendly names for metabolites
+  igraph::V(g)$name_met <- metabolites.annotation$metabolites[igraph::V(g)$name_met]$metabolite_name
+
+  # rename atoms in vertices
+  vertices <- data.table::as.data.table(igraph::as_data_frame(g, what = "vertices"))
+  vertices <- vertices[, !c("label")]
+  vertices$atom <- stringr::str_replace(vertices$name, "_", "|")
+  vertices <- vertices[, c("met", "atom") := data.table::tstrsplit(atom, "\\|")]
+  vertices <- vertices[, !c("met")]
+  vertices <- vertices[, atom := as.integer(factor(atom, levels = unique(atom))), by = "name_met"]
+  vertices <- vertices[, atom := sprintf("%s (%s%s)", name_met, element, atom), by = "name_met"]
+  data.table::setnames(vertices, c("atom", "name"), c("label", "atom"))
+  vertices <- vertices[, !c("name_met", "element")]
+  data.table::setcolorder(vertices, c("label", colnames(vertices)[which(colnames(vertices) != "label")]))
+
+  # rename from/to of edges based on translated vertices
+  edges <- data.table::as.data.table(igraph::as_data_frame(g, what = "edges"))
+  vertices_as_key <- vertices[, c("atom", "label")]
+  data.table::setkey(vertices_as_key, atom, label)
+  data.table::setkey(edges, to)
+  edges <- vertices_as_key[edges]
+  edges <- edges[, !c("atom")]
+  data.table::setnames(edges, "label", "to")
+  data.table::setkey(edges, from)
+  edges <- vertices_as_key[edges]
+  edges <- edges[, !c("atom")]
+  data.table::setnames(edges, "label", "from")
+
+  g_renamed <- igraph::graph_from_data_frame(as.data.frame(edges), vertices = as.data.frame(vertices), directed = F)
+
+  return(g_renamed)
+
+}
+
+
+# from rUtils package
+collapseBy <- function(es, factor, FUN=median) {
+  ranks <- apply(Biobase::exprs(es), 1, FUN)
+  t <- data.frame(f=factor, i=seq_along(ranks), r=ranks)
+  t <- t[order(t$r, decreasing=T), ]
+  keep <- t[!duplicated(t$f) & !is.na(t$f),]$i
+  res <- es[keep, ]
+  Biobase::fData(res)$origin <- rownames(res)
+  rownames(res) <- factor[keep]
+  res
+}
