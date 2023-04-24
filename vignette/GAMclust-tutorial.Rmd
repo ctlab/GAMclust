@@ -138,7 +138,7 @@ slot during preceding preprocessing as shown below:
 ```{r}
 seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds")
 
-genes.avrg <- apply(seurat_object@assays$Spatial@data, 1, mean)
+genes.avrg <- rowMeans(seurat_object@assays$Spatial@data)
 genes.top12k <- names(head(sort(genes.avrg, decreasing = TRUE), 12000))
 seurat_object <- Seurat::SCTransform(seurat_object, 
                                      assay = "Spatial", 
