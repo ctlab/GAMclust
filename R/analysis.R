@@ -198,11 +198,11 @@ gamClustering <- function(E.prep,
                           network.prep,
                           cur.centers,
                           
-                          start.base = 1,
+                          start.base = 0.5,
                           base.dec = 0.05,
                           max.module.size = 50,
                           
-                          p.adj.val.threshold = 0.01,
+                          p.adj.val.threshold = 0.001,
                           
                           batch.solver = seq_batch_solver(solver),
                           work.dir,
@@ -298,7 +298,7 @@ gamClustering <- function(E.prep,
       
       m.size.unique <- unlist(lapply(ms_mods, function(x) ulength(igraph::edge_attr(x)$gene)))
 
-      if(collect.stats){
+      if (collect.stats) {
         iter.stats_add <- data.frame(
           genes.n = dim(E.prep)[1],
           genes.pos.scored = posScores_keeping_var,
@@ -310,7 +310,7 @@ gamClustering <- function(E.prep,
         )
         iter.stats[[iteration]] <- iter.stats_add
       }
-      if(verbose){
+      if (verbose) {
         messagef(">> base was equal to: %s;", base)
         messagef(">> number of modules was equal to: %s;", length(ms_mods))
         messagef(">> sizes of modules (unique genes) were in range: %s-%s", min(m.size.unique), max(m.size.unique))
@@ -383,25 +383,42 @@ gamClustering <- function(E.prep,
 
     if (length(rev$modules) == 1) {break}
     
-    # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF UNINFORMATIVE ONES
+    # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF (i) CORRELATED & (ii) UNINFORMATIVE ONES
     
-    gesecaRes <- doGeseca(E.prep = E.prep,
-                          network.prep = network.prep,
-                          network.annotation = network.annotation,
-                          modules = rev$modules,
-                          scale = FALSE,
-                          center = FALSE,
-                          verbose = verbose)
-
-    good <- gesecaRes$pathway[which(gesecaRes$padj < p.adj.val.threshold)]
-    bad <- rownames(cur.centers)[!rownames(cur.centers) %in% good]
+    # (i) correlated: 
+    centers.cors <- cor(t(rev$centers.pos))
+    diag(centers.cors) <- 0
+    correlation.max <- apply(centers.cors, 1, max)
     
-    if (length(bad) == 0) {break} 
-    
-    centersCor <- cor(t(cur.centers))
-    diag(centersCor) <- NA
-    toRemove <- bad[which.max(apply(centersCor, 1, max, na.rm=T)[bad])]
-    cur.centers <- cur.centers[!rownames(cur.centers) %in% toRemove, , drop = F]
+    if (any(correlation.max > 0.8)) {
+      max.cor.mod1 <- which.max(correlation.max) 
+      max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
+      cur.centers[max.cor.mod1, ] <- getCenter(
+        E.prep, 
+        unique(c(igraph::E(ms_mods[[max.cor.mod1]])[score > 0]$gene,
+                 igraph::E(ms_mods[[max.cor.mod2]])[score > 0]$gene)))
+      cur.centers <- cur.centers[-max.cor.mod2, ]  
+    } else {
+      
+      # (ii) uninformative:
+      gesecaRes <- doGeseca(E.prep = E.prep,
+                            network.prep = network.prep,
+                            network.annotation = network.annotation,
+                            modules = rev$modules,
+                            scale = FALSE,
+                            center = FALSE,
+                            verbose = verbose)
+      
+      good <- gesecaRes$pathway[which(gesecaRes$padj < p.adj.val.threshold)]
+      bad <- rownames(cur.centers)[!rownames(cur.centers) %in% good]
+      
+      if (length(bad) == 0) {break} 
+      
+      centersCor <- cor(t(cur.centers))
+      diag(centersCor) <- NA
+      toRemove <- bad[which.max(apply(centersCor, 1, max, na.rm=T)[bad])]
+      cur.centers <- cur.centers[!rownames(cur.centers) %in% toRemove, , drop = F]
+    }
     
     # keep expressions devoted to sizes of modules:
     # m.sizes <- sapply(modules, function(m) ulength(igraph::E(m)$gene))

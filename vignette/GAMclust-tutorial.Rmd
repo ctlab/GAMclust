@@ -240,7 +240,7 @@ results <- gamClustering(E.prep = E.prep,
                          # start.base = 0.04,
                          # base.dec = 0,
                          
-                         start.base = 1,
+                         start.base = 0.05,
                          base.dec = 0.05,
                          max.module.size = 50,
 
