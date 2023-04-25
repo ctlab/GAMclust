@@ -179,9 +179,10 @@ preClustering <- function(E.prep,
 #' @param E.prep Expression matrix after the `prepareData()` function.
 #' @param network.prep Network edge table driven from `prepareNetwork()` function.
 #' @param cur.centers Initial patterns produced by `preClustering()` function.
-#' @param start.base The distance to the fake pattern which influences `max.module.size` parameter. Equal to 1 at the beginning.
+#' @param start.base The parameter which influences modules sizes.
 #' @param base.dec The value by which `base` parameter should be reduced if some module's size is bigger that `max.module.size`.
 #' @param max.module.size Maximal number of unique genes in the final module.
+#' @param p.adj.val.threshold Padj threshold of geseca score for final modules.
 #' @param batch.solver Solver for SGMWCS problem.
 #' @param work.dir Working directory where results should be saved.
 #' @param show.intermediate.clustering Whether to show or not heatmap of intermideate clusters.
@@ -194,7 +195,6 @@ preClustering <- function(E.prep,
 #' @return results$iter.stats -- Statistics from iterations.
 #' @export
 gamClustering <- function(E.prep,
-                          # E.matrix,
                           network.prep,
                           cur.centers,
                           
@@ -244,13 +244,6 @@ gamClustering <- function(E.prep,
       
       # 1. CALCULATE CORRELATIONS -> DISTANCES -> SCORES
 
-      # initially was:
-      # dist.to.centers <- 1-cor(t(cur.centers), y=t(E.prep))
-      # then:
-      # dist.to.centers <- 1-( (cur.centers %*% t(E.prep)) / max(rowSums(E.prep**2)) )
-      # then: 
-      # dist.to.centers <- 1-( (cur.centers %*% t(E.prep)) / sqrt(ncol(E.prep)-1) / sqrt(max(rowSums(E.prep**2))) )
-      # now:
       # the projection of genes onto the centroids (measures of similarity between each gene and each centroid, cosine similarity between the two vectors):
       m <- cur.centers %*% t(E.prep) # 32 x samples * samples x genes = 32 x genes
       # ensure that the similarities between genes & centroids in m are not biased by differences in the magnitudes of ...
@@ -300,9 +293,10 @@ gamClustering <- function(E.prep,
       ms <- batch.solver(nets_attr)
       cat("Done: batch.solver(nets)\n")
       ms_mods <- lapply(ms, `[[`, "graph")
-      rev$modules <- ms_mods
       
       # 2.a. COLLECT CORRESPONDING LOGS
+      
+      m.size.unique <- unlist(lapply(ms_mods, function(x) ulength(igraph::edge_attr(x)$gene)))
 
       if(collect.stats){
         iter.stats_add <- data.frame(
@@ -310,7 +304,7 @@ gamClustering <- function(E.prep,
           genes.pos.scored = posScores_keeping_var,
           base = base,
           m.size = unlist(lapply(ms_mods, igraph::gsize)),
-          m.size.unique = unlist(lapply(ms_mods, function(x) ulength(igraph::edge_attr(x)$gene))),
+          m.size.unique = m.size.unique,
           m.pos = unlist(lapply(ms_mods, function(x) sum(igraph::edge_attr(x)$score > 0))),
           m.non.neg = unlist(lapply(ms_mods, function(x) sum(igraph::edge_attr(x)$score >= 0)))
         )
@@ -319,11 +313,12 @@ gamClustering <- function(E.prep,
       if(verbose){
         messagef(">> base was equal to: %s;", base)
         messagef(">> number of modules was equal to: %s;", length(ms_mods))
-        messagef(">> sizes of modules (unique genes) were in range: %s-%s", # TODO: works when collect.stats == TRUE
-                 min(iter.stats[[iteration]]$m.size.unique),max(iter.stats[[iteration]]$m.size.unique))
+        messagef(">> sizes of modules (unique genes) were in range: %s-%s", min(m.size.unique), max(m.size.unique))
       }
 
-      # 2.b. RECORD CENTERS AND MODULES
+      # 2.b. RECORD MODULES AND CENTERS
+      
+      rev$modules <- ms_mods
       
       for (i in idxs) {
 
@@ -352,12 +347,12 @@ gamClustering <- function(E.prep,
           cluster_rows=F, cluster_cols=F,
           show_rownames=T, show_colnames=F)
       }
-
+      
       revs[[k]] <- rev
       
       # 3. UPDATE PARAMETERS
       
-      if(max(sapply(ms_mods, function(m) ulength(igraph::E(m)$gene))) > max.module.size){
+      if (max(sapply(ms_mods, function(m) ulength(igraph::E(m)$gene))) > max.module.size) {
         base <- base - base.dec
       }
       
@@ -439,8 +434,7 @@ gamClustering <- function(E.prep,
   # *
   dir.create(sprintf("%s/stats", work.dir), showWarnings=FALSE, recursive=TRUE)
   write.tsv(gesecaRes, file = sprintf("%s/stats/geseca_scores.tsv", work.dir))
-  write.tsv(revs$centers.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir))
-  write.tsv(revs$centers.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir))
+  write.tsv(rbind(rev$centers.pos, rev$centers.all), file = sprintf("%s/stats/patterns.tsv", work.dir))
   saveRDS(iter.stats, file = sprintf("%s/stats/iter.stats.rds", work.dir))
   # *
 
