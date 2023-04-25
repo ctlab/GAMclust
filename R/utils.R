@@ -59,10 +59,10 @@ doGeseca <- function(E.prep,
     lapply(modules, function(cm) {igraph::E(cm)$gene}), 
     paste0("c.pos", seq_along(modules)))
   
-  gesecaRes <- geseca(pathways = modules_path, 
-                      E = E.prep_filtered, 
-                      scale = scale,
-                      center = center)
+  suppressWarnings(gesecaRes <- geseca(pathways = modules_path,
+                                       E = E.prep_filtered, 
+                                       scale = scale,
+                                       center = center))
   
   if(verbose){
     messagef(">> geseca padjs were in range: %s", paste(round(range(gesecaRes$padj), 5), collapse = "-"))}
