@@ -237,10 +237,10 @@ results <- gamClustering(E.prep = E.prep,
                          network.prep = network.prep,
                          cur.centers = cur.centers,
                          
-                         # start.base = 0.04,
+                         # start.base = 0.4,
                          # base.dec = 0,
                          
-                         start.base = 0.05,
+                         start.base = 0.5,
                          base.dec = 0.05,
                          max.module.size = 50,
 

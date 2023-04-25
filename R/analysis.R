@@ -391,6 +391,7 @@ gamClustering <- function(E.prep,
     correlation.max <- apply(centers.cors, 1, max)
     
     if (any(correlation.max > 0.8)) {
+      messagef("Max cor exceeded 0.8: %s", round(max(correlation.max), 2))
       max.cor.mod1 <- which.max(correlation.max) 
       max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
       cur.centers[max.cor.mod1, ] <- getCenter(
@@ -431,7 +432,7 @@ gamClustering <- function(E.prep,
   # (i) compactise
   modules_pre <- lapply(rev$modules, function(x) {
     igraph::graph.attributes(x)$signals[which(names(igraph::graph.attributes(x)$signals) %in%
-                                                igraph::vertex_attr(x)$signal)] <- -0.01
+                                                igraph::vertex_attr(x)$signal)] <- -0.001
     x
   })
   modules_set <- batch.solver(modules_pre)
