@@ -31,6 +31,18 @@ getCenter <- function(gene.exprs,
   center
 }
 
+
+updCenters <- function(cur.centers, m1, m2, E.prep, ms_mods) {
+  
+  cur.centers[m1, ] <- getCenter(
+    E.prep, 
+    unique(c(igraph::E(ms_mods[[m1]])[score > 0]$gene,
+             igraph::E(ms_mods[[m2]])[score > 0]$gene)))
+  
+  cur.centers <- cur.centers[-m2, ] 
+}
+
+
 dualGraph <- function(m, what) {
   t1 <- data.table::as.data.table(igraph::as_data_frame(m)[, c("from", "to", what)])
   t2 <- data.table::copy(t1)

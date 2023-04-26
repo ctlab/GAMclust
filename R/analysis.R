@@ -386,19 +386,17 @@ gamClustering <- function(E.prep,
     # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF (i) CORRELATED & (ii) UNINFORMATIVE ONES
     
     # (i) correlated: 
-    centers.cors <- cor(t(rev$centers.pos))
+    centers.cors <- cor(t(cur.centers))
     diag(centers.cors) <- 0
-    correlation.max <- apply(centers.cors, 1, max)
+    correlation.max <- apply(centers.cors, 1, max, na.rm=T)
     
     if (any(correlation.max > 0.8)) {
       messagef("Max cor exceeded 0.8: %s", round(max(correlation.max), 2))
       max.cor.mod1 <- which.max(correlation.max) 
       max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
-      cur.centers[max.cor.mod1, ] <- getCenter(
-        E.prep, 
-        unique(c(igraph::E(ms_mods[[max.cor.mod1]])[score > 0]$gene,
-                 igraph::E(ms_mods[[max.cor.mod2]])[score > 0]$gene)))
-      cur.centers <- cur.centers[-max.cor.mod2, ]  
+      cur.centers <- updCenters(cur.centers = cur.centers, 
+                                m1 = max.cor.mod1, m2 = max.cor.mod2, 
+                                E.prep = E.prep, ms_mods = ms_mods)
     } else {
       
       # (ii) uninformative:
@@ -415,10 +413,13 @@ gamClustering <- function(E.prep,
       
       if (length(bad) == 0) {break} 
       
-      centersCor <- cor(t(cur.centers))
-      diag(centersCor) <- NA
-      toRemove <- bad[which.max(apply(centersCor, 1, max, na.rm=T)[bad])]
-      cur.centers <- cur.centers[!rownames(cur.centers) %in% toRemove, , drop = F]
+      centers.cors <- cor(t(cur.centers))
+      diag(centers.cors) <- 0
+      max.cor.mod1 <- as.integer(gsub("c.pos", "", bad[which.max(apply(centers.cors, 1, max, na.rm=T)[bad])]))
+      max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
+      cur.centers <- updCenters(cur.centers = cur.centers, 
+                                m1 = max.cor.mod1, m2 = max.cor.mod2, 
+                                E.prep = E.prep, ms_mods = ms_mods)
     }
     
     # keep expressions devoted to sizes of modules:

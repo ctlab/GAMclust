@@ -105,10 +105,18 @@ solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
 (6) set working directory where the results will be saved to.
 
 ```{r}
-work.dir <- "~/Documents/4projects/nets/GAM-clustering/runs/bulk_new/test_Apr25"
+# work.dir <- "/mnt/tank/scratch/againullina/testdata/tms_delCor2_10-5_0.5-0.05"
+work.dir <- "~/Documents/4projects/nets/GAM-clustering/runs/tms_delCor2_10-5_0.5-0.05"
 dir.create(work.dir, showWarnings = F, recursive = T)
+```
 
-log_file <- file(paste0(work.dir, "/log.txt"), open = "wt")
+(7) TEMPORARY: collecting logs while developing the tool.
+
+```{r}
+stats.dir <- paste0(work.dir, "/stats")
+dir.create(stats.dir, showWarnings = F, recursive = T)
+
+log_file <- file(paste0(stats.dir, "/log.txt"), open = "wt")
 sink(log_file, type = "output", append = TRUE)
 sink(log_file, type = "message", append = TRUE)
 ```
