@@ -182,6 +182,7 @@ preClustering <- function(E.prep,
 #' @param start.base The parameter which influences modules sizes.
 #' @param base.dec The value by which `base` parameter should be reduced if some module's size is bigger that `max.module.size`.
 #' @param max.module.size Maximal number of unique genes in the final module.
+#' @param cor.threshold Threshold for correlation between module patterns.
 #' @param p.adj.val.threshold Padj threshold of geseca score for final modules.
 #' @param batch.solver Solver for SGMWCS problem.
 #' @param work.dir Working directory where results should be saved.
@@ -202,6 +203,7 @@ gamClustering <- function(E.prep,
                           base.dec = 0.05,
                           max.module.size = 50,
                           
+                          cor.threshold = 0.8,
                           p.adj.val.threshold = 0.001,
                           
                           batch.solver = seq_batch_solver(solver),
@@ -390,8 +392,8 @@ gamClustering <- function(E.prep,
     diag(centers.cors) <- 0
     correlation.max <- apply(centers.cors, 1, max, na.rm=T)
     
-    if (any(correlation.max > 0.8)) {
-      messagef("Max cor exceeded 0.8: %s", round(max(correlation.max), 2))
+    if (any(correlation.max > cor.threshold)) {
+      messagef("Max cor exceeded %s: %s", cor.threshold, round(max(correlation.max), 2))
       max.cor.mod1 <- which.max(correlation.max) 
       max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
       cur.centers <- updCenters(cur.centers = cur.centers, 

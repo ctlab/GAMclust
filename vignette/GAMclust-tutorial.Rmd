@@ -252,6 +252,7 @@ results <- gamClustering(E.prep = E.prep,
                          base.dec = 0.05,
                          max.module.size = 50,
 
+                         cor.threshold = 0.8,
                          p.adj.val.threshold = 0.00001,
 
                          batch.solver = seq_batch_solver(solver),
