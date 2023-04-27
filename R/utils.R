@@ -411,3 +411,8 @@ collapseBy <- function(es, factor, FUN=median) {
   rownames(res) <- factor[keep]
   res
 }
+
+colors4heatmap <- c("snow2", "purple4", "#5E4FA2", "#486ecf", "#3288BD", 
+                    "#66adc2", "#66C2A5", "#ABDDA4", "#E6F598", "#FEE08B", "#fad56b",
+                    "#f7bd16", "#FDAE61", "#F46D43", "#D53E4F", "#9E0142", 
+                    "#8B0001", "#830001", "#720000", "#690000", "#610000")

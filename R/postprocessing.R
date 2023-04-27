@@ -168,9 +168,9 @@ getAnnotationTables <- function(network.annotation, nets, work.dir,
 #' @return Results of this function can be seen in work.dir (png files)
 #' @export
 getAnnotationHeatmap <- function(work.dir,
-                                     padj.threshold = Inf,
-                                     threshold = 0,
-                                     file_name="Modules_heatmap.png") {
+                                 padj.threshold = Inf,
+                                 threshold = 0.05,
+                                 file_name="Modules_heatmap.png") {
 
   # files with pathways
   # reorder because if >9 default order is lexicographic: 1, 10, 11, 2, 3....
@@ -244,7 +244,8 @@ getAnnotationHeatmap <- function(work.dir,
     # height=ifelse(max_len < 90, 8, ceiling(max_len/11)),
     cellwidth=30,
     file=file.path(work.dir, file_name),
-    color = c("snow2", rev(RColorBrewer::brewer.pal(11, "Spectral"))))
+    breaks = seq(0, 1, 0.05),
+    color = colors4heatmap)
 
 }
 

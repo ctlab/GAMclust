@@ -459,8 +459,8 @@ getAnnotationTables(network.annotation = network.annotation,
                     work.dir = work.dir)
 
 getAnnotationHeatmap(work.dir = work.dir, 
-                     threshold = 0.1, 
-                     file_name = "Modules_heatmap_0.1.png")
+                     threshold = 0.05, 
+                     file_name = "Modules_heatmap.png")
 ```
 
 The example of the content of the annotation file derived for the
