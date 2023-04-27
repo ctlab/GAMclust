@@ -455,7 +455,8 @@ gamClustering <- function(E.prep,
   # *
   dir.create(sprintf("%s/stats", work.dir), showWarnings=FALSE, recursive=TRUE)
   write.tsv(gesecaRes, file = sprintf("%s/stats/geseca_scores.tsv", work.dir))
-  write.tsv(rbind(rev$centers.pos, rev$centers.all), file = sprintf("%s/stats/patterns.tsv", work.dir))
+  write.tsv(rev$centers.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir))
+  write.tsv(rev$centers.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir))
   saveRDS(iter.stats, file = sprintf("%s/stats/iter.stats.rds", work.dir))
   # *
 
