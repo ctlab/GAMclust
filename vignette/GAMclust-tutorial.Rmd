@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
 
 Required packages to be installed:
 
-```{r}
+```{r, eval=FALSE}
 install.packages("mwcsr")
 install.packages("fgsea")
 devtools::install_github("ctlab/gatom")
@@ -48,7 +48,7 @@ GAM-clustering analysis:
 (2) load metabolites annotation: `met.kegg.db.rds` for KEGG network and
     `met.rhea.db.rds` is for RHEA network;
 
-```{r}
+```{r, eval=FALSE}
 # KEGG:
 
 network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.kegg.rds"))
@@ -67,7 +67,7 @@ metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications
     `org.Hs.eg.gatom.anno` for human data (network annotation is the
     same for both networks);
 
-```{r}
+```{r, eval=FALSE}
 # mouse:
 
 network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds"))
@@ -85,7 +85,7 @@ network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/sup
     during the analysis as connections between reactions (e.g., CO2,
     HCO3-, etc);
 
-```{r}
+```{r, eval=FALSE}
 met.to.filter <- data.table::fread(system.file("mets2mask_MashaE_now.lst", package="GAMclust"))$ID
 ```
 
@@ -95,7 +95,7 @@ met.to.filter <- data.table::fread(system.file("mets2mask_MashaE_now.lst", packa
     documentation](https://rdrr.io/cran/mwcsr/f/vignettes/tutorial.Rmd)
     for more options);
 
-```{r}
+```{r, eval=FALSE}
 # solver <- mwcsr::rnc_solver()
 cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
 # cplex.dir <- "/nfs/home/againullina/lib/sgmwcs/private-libraries/CPLEX_Studio1271"
@@ -104,7 +104,7 @@ solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
 
 (6) set working directory where the results will be saved to.
 
-```{r}
+```{r, eval=FALSE}
 # work.dir <- "/mnt/tank/scratch/againullina/testdata/tms_delCor2_10-5_0.5-0.05"
 work.dir <- "~/Documents/4projects/nets/GAM-clustering/runs/tms_delCor2_10-5_0.5-0.05"
 dir.create(work.dir, showWarnings = F, recursive = T)
@@ -112,7 +112,7 @@ dir.create(work.dir, showWarnings = F, recursive = T)
 
 (7) TEMPORARY: collecting logs while developing the tool.
 
-```{r}
+```{r, eval=FALSE}
 stats.dir <- paste0(work.dir, "/stats")
 dir.create(stats.dir, showWarnings = F, recursive = T)
 
@@ -129,7 +129,7 @@ GAMclust works with both bulk and single cell RNAseq data.
 
 ##### Example of bulk RNAseq data
 
-```{r}
+```{r, eval=FALSE}
 load("/home/octopus/Documents/4projects/immGen/final_objects/243_es.top12k.Rda")
 E <- Biobase::exprs(es.top12k)
 E[1:3, 1:3]
@@ -143,7 +143,7 @@ pipeline, we recommend to use `assay=SCT` and `slot=scale.data` for the
 further analysis. In this case keep top 12,000 genes in `scale.data`
 slot during preceding preprocessing as shown below:
 
-```{r}
+```{r, eval=FALSE}
 seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds")
 
 genes.avrg <- Matrix::rowMeans(seurat_object@assays$Spatial@data)
@@ -160,7 +160,7 @@ dim(E)
 E[1:3, 1:3]
 ```
 
-```{r}
+```{r, eval=FALSE}
 seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/per.rds")
 
 seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/tms12k.rds")
@@ -181,7 +181,7 @@ out genes with low noisy expression by setting `keep.top.genes=12000`
 for robust analysis. However, you may keep more or less genes, if
 required.
 
-```{r}
+```{r, eval=FALSE}
 E.prep <- prepareData(E = E,
                       gene.id.type = "Symbol",
                       keep.top.genes = 12000,
@@ -198,7 +198,7 @@ The `prepareNetwork()` function predefines the structure of the final
 metabolic modules. At your choice, vertices can be represented either as
 `metabolites` or as `atoms` (by the `topology` parameter).
 
-```{r}
+```{r, eval=FALSE}
 network.prep <- prepareNetwork(E = E.prep,
                                network = network,
                                topology = "metabolites",
@@ -214,7 +214,7 @@ initial clustering for no less than 32 clusters.
 
 You can visualize the initial heatmap as shown below.
 
-```{r, fig.width=20, fig.height=7}
+```{r, eval=FALSE, fig.width=20, fig.height=7}
 cur.centers <- preClustering(E.prep = E.prep,
                              network.prep = network.prep,
                              initial.number.of.clusters = 32,
@@ -356,7 +356,7 @@ pheatmap::pheatmap(
 
 For single-cell data (common & individual):
 
-```{r}
+```{r, eval=FALSE}
 library(Seurat)
 library(fgsea) # install latest!
 
@@ -405,7 +405,7 @@ ggplot2::ggsave(file = file.path(work.dir, "m.centers_sc.pdf"),
 
 For spatial data (common & individual):
 
-```{r}
+```{r, eval=FALSE}
 library(Seurat)
 library(fgsea) # install latest!
 
@@ -436,11 +436,11 @@ For the pattern highlighted with the green box, graph (produced by
 `getGraphs()`) and genes heatmap (produced by `getHeatmaps()`) are also
 shown below.
 
-```{r centers, echo=FALSE, fig.cap="", out.width = '100%'}
+```{r centers, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
 knitr::include_graphics("inst/vignette-data/centers.png")
 ```
 
-```{r graphANDheatmap, echo=FALSE, fig.cap="", out.width = '100%'}
+```{r graphANDheatmap, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
 knitr::include_graphics("inst/vignette-data/graphANDheatmap.png")
 ```
 
@@ -467,7 +467,7 @@ getAnnotationHeatmap(work.dir = work.dir,
 The example of the content of the annotation file derived for the
 example module is shown above.
 
-```{r, echo = FALSE}
+```{r, eval=FALSE, echo = FALSE}
 data.table::fread("inst/vignette-data/m.5.pathways.tsv")
 ```
 
@@ -478,7 +478,7 @@ dataset (e.g. runs with different parameters) or compare two results of
 running GAM-clustering on different datasets (set `same.data` parameter
 to `FALSE` in that case).
 
-```{r, eval = FALSE}
+```{r, eval=FALSE, eval = FALSE}
 modulesSimilarity(dir1 = work.dir,
                   dir2 = "/mnt/tank/scratch/againullina/testdata/test2_branch/",
                   name1 = "new",
@@ -496,6 +496,6 @@ genes that intersect in these two modules. The left heatmap consider all
 genes from modules, the right heatmap -- only genes with positive score
 (genes which are more important in the module).
 
-```{r comparison, echo=FALSE, fig.cap="", out.width = '100%'}
+```{r comparison, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
 knitr::include_graphics("inst/vignette-data/comparison.png")
 ```
