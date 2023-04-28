@@ -1,6 +1,6 @@
 ---
 title: '[GAM-clustering](http://artyomovlab.wustl.edu/immgen-met/) Tutorial Notebook'
-date: 2023/01/27
+date: 2023/04/28
 output:
   html_document:
     df_print: paged
@@ -21,12 +21,12 @@ knitr::opts_chunk$set(
 Required packages to be installed:
 
 ```{r, eval=FALSE}
-install.packages("mwcsr")
-install.packages("fgsea")
+devtools::install_github("ctlab/fgsea")
 devtools::install_github("ctlab/gatom")
+devtools::install_github("ctlab/mwcsr")
 
-library(gatom)
 library(fgsea)
+library(gatom)
 library(data.table)
 # library(GAMclust)
 devtools::load_all(getwd())
@@ -37,16 +37,11 @@ set.seed(42)
 
 ### Preparing working environment
 
-First, please load and initialize all objects required for
-GAM-clustering analysis:
+First, please load and initialize all objects required for GAM-clustering analysis:
 
-(1) load one of the provided metabolic networks: `network.kegg.rds` is
-    built based on the [KEGG database](https://www.genome.jp/kegg/),
-    `network.rhea.rds` is built based on the [RHEA
-    database](https://www.rhea-db.org/);
+(1) load one of the provided metabolic networks: `network.kegg.rds` is built based on the [KEGG database](https://www.genome.jp/kegg/), `network.rhea.rds` is built based on the [RHEA database](https://www.rhea-db.org/);
 
-(2) load metabolites annotation: `met.kegg.db.rds` for KEGG network and
-    `met.rhea.db.rds` is for RHEA network;
+(2) load metabolites annotation: `met.kegg.db.rds` for KEGG network and `met.rhea.db.rds` is for RHEA network;
 
 ```{r, eval=FALSE}
 # KEGG:
@@ -57,48 +52,44 @@ metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications
 
 # Rhea:
 
-network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.rhea.rds"))
+# network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.rhea.rds"))
 
-metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.rhea.db.rds"))
+# metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.rhea.db.rds"))
 ```
 
-(3) load species-specific network annotation: `org.Mm.eg.gatom.anno` for
-    mouse data, `org.Rn.eg.gatom.anno` for rat data and
-    `org.Hs.eg.gatom.anno` for human data (network annotation is the
-    same for both networks);
+(3) load species-specific network annotation: `org.Hs.eg.gatom.anno` for human data or `org.Mm.eg.gatom.anno` for mouse data (network annotation is the same for both networks);
 
 ```{r, eval=FALSE}
+# human:
+
+network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds"))
+
 # mouse:
 
 network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds"))
 
 # rat:
 
-network.annotation <- readRDS("org.Rn.eg.gatom.anno.rds")
-
-# human:
-
-network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds"))
+# network.annotation <- readRDS("org.Rn.eg.gatom.anno.rds")
 ```
 
-(4) load provided list of metabolites that should not be considered
-    during the analysis as connections between reactions (e.g., CO2,
-    HCO3-, etc);
+(4) load provided list of metabolites that should not be considered during the analysis as connections between reactions (e.g., CO2, HCO3-, etc);
 
 ```{r, eval=FALSE}
-met.to.filter <- data.table::fread(system.file("mets2mask_MashaE_now.lst", package="GAMclust"))$ID
+met.to.filter <- data.table::fread(system.file("mets2mask.lst", package="GAMclust"))$ID
 ```
 
-(5) initialize SMGWCS solver (we recommend to use here heuristic
-    relax-and-cut solver `rnc_solver` from `mwcsr` package (check its
-    [official
-    documentation](https://rdrr.io/cran/mwcsr/f/vignettes/tutorial.Rmd)
-    for more options);
+(5) initialize SMGWCS solver: we recommend to use here either heuristic relax-and-cut solver `rnc_solver` from `mwcsr` package or to install proprietary [CPLEX solver](https://www.ibm.com/products/ilog-cplex-optimization-studio/cplex-optimizer) (free for academy) on your computer (find more info in `mwcsr`'s [official documentation](https://github.com/ctlab/mwcsr) regarding both approaches);
 
 ```{r, eval=FALSE}
+# relax-and-cut solver:
+
 # solver <- mwcsr::rnc_solver()
-cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
+
+# CPLEX SOLVER:
+
 # cplex.dir <- "/nfs/home/againullina/lib/sgmwcs/private-libraries/CPLEX_Studio1271"
+cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
 solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
 ```
 
@@ -106,7 +97,7 @@ solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
 
 ```{r, eval=FALSE}
 # work.dir <- "/mnt/tank/scratch/againullina/testdata/tms_delCor2_10-5_0.5-0.05"
-work.dir <- "~/Documents/4projects/nets/GAM-clustering/runs/tms_delCor2_10-5_0.5-0.05"
+work.dir <- "~/Documents/4projects/nets/GAM-clustering/runs/test"
 dir.create(work.dir, showWarnings = F, recursive = T)
 ```
 
@@ -125,9 +116,14 @@ sink(log_file, type = "message", append = TRUE)
 
 #### Preparing data
 
-GAMclust works with both bulk and single cell RNAseq data.
+GAMclust works with bulk, single cell and spatial RNA-seq data.
 
-##### Example of bulk RNAseq data
+If single cell and spatial RNA-seq data were processed by
+[Seurat](https://satijalab.org/seurat/articles/essential_commands.html)
+pipeline, we recommend to use `assay="SCT"` and `slot="scale.data"` for the
+further analysis. In this case during data preprocessing please force either `residual.features` parameter of `SCTransform()` (in case of one-sample data) or `nfeatures` parameter of `SelectIntegrationFeatures()` (in case of multi-sample data) to keep 10,000 genes in `scale.data` slot. Example for spatial data is shown below.
+
+##### Example of bulk RNA-seq data
 
 ```{r, eval=FALSE}
 load("/home/octopus/Documents/4projects/immGen/final_objects/243_es.top12k.Rda")
@@ -135,56 +131,50 @@ E <- Biobase::exprs(es.top12k)
 E[1:3, 1:3]
 ```
 
-##### Example of single cell RNAseq data
+##### Example of single cell RNA-seq data
 
-UNDER THE DEVELOPMENT: If data were processed by
-[Seurat](https://satijalab.org/seurat/articles/essential_commands.html)
-pipeline, we recommend to use `assay=SCT` and `slot=scale.data` for the
-further analysis. In this case keep top 12,000 genes in `scale.data`
-slot during preceding preprocessing as shown below:
+```{r, eval=FALSE}
+seurat_object <- readRDS("/home/octopus/Documents/4projects/idb/1_aggression/subset_PE/per.rds")
+
+seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/tms12k.rds")
+
+E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
+                                    assay = "SCT",
+                                    slot = "scale.data"))
+
+nrow(E) # ! make sure this value is equal to 10000
+
+E[1:3, 1:3]
+```
+
+##### Example of spatial RNA-seq data
 
 ```{r, eval=FALSE}
 seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds")
 
 genes.avrg <- Matrix::rowMeans(seurat_object@assays$Spatial@data)
-genes.top12k <- names(head(sort(genes.avrg, decreasing = TRUE), 12000))
+genes.top10k <- names(head(sort(genes.avrg, decreasing = TRUE), 10000))
 seurat_object <- Seurat::SCTransform(seurat_object, 
                                      assay = "Spatial", 
-                                     residual.features = genes.top12k, 
+                                     residual.features = genes.top10k, 
                                      verbose = TRUE)
 
 E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
-                                    assay = "SCT", # or "RNA"
-                                    slot = "scale.data")) # "data"
-dim(E)
+                                    assay = "SCT",
+                                    slot = "scale.data"))
+
+nrow(E) # ! make sure this value is equal to 10000
+
 E[1:3, 1:3]
 ```
 
-```{r, eval=FALSE}
-seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/per.rds")
+Genes in your dataset may be named as Symbol, Entrez, Ensembl or RefSeq IDs. One of these names should be specified as value of `gene.id.type` parameter in `prepareData()`. 
 
-seurat_object <- readRDS("/mnt/tank/scratch/againullina/testdata/tms12k.rds")
-
-E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
-                                    assay = "SCT", # or "RNA"
-                                    slot = "scale.data")) # "data"
-dim(E)
-E[1:3, 1:3]
-```
-
-In prepareData() we recommend to set `use.PCA=TRUE` if you use
-large-scale singe cell RNAseq data (more than 1,000 cells) to accelerate
-the calculations.
-
-We also recommend to keep only top 12,000 most expressed genes to filter
-out genes with low noisy expression by setting `keep.top.genes=12000`
-for robust analysis. However, you may keep more or less genes, if
-required.
+If you analyse singe cell or spatial RNA-seq data, please set `use.PCA=TRUE` in `prepareData()`.
 
 ```{r, eval=FALSE}
 E.prep <- prepareData(E = E,
                       gene.id.type = "Symbol",
-                      keep.top.genes = 12000,
                       use.PCA = TRUE,
                       use.PCA.n = 50,
                       network.annotation = network.annotation)
@@ -194,23 +184,18 @@ E.prep[1:3, 1:3]
 
 #### Preparing network
 
-The `prepareNetwork()` function predefines the structure of the final
-metabolic modules. At your choice, vertices can be represented either as
-`metabolites` or as `atoms` (by the `topology` parameter).
+The `prepareNetwork()` function defines the structure of the final metabolic modules. 
 
 ```{r, eval=FALSE}
 network.prep <- prepareNetwork(E = E.prep,
                                network = network,
-                               topology = "metabolites",
                                met.to.filter = met.to.filter,
                                network.annotation = network.annotation)
 ```
 
 #### Preclustering
 
-The `preClustering()` function defines initial patterns using k-medoids
-clustering on gene expression matrix. It is strongly recommended to do
-initial clustering for no less than 32 clusters.
+The `preClustering()` function defines initial patterns using k-medoids clustering on gene expression matrix. It is strongly recommended to do initial clustering with no less than 32 clusters.
 
 You can visualize the initial heatmap as shown below.
 
@@ -232,28 +217,29 @@ pheatmap::pheatmap(
 
 Now you have everything prepared for the GAM-clustering analysis.
 
-Initial patterns will be now refined in an iterative process. The output
-of `gamClustering()` function presents a set of specific subnetworks
-(also called metabolic modules) that reflect metabolic variability
-within a given transcriptional dataset.
+Initial patterns will be now refined in an iterative process. The output of `gamClustering()` function presents a set of specific subnetworks (also called metabolic modules) that reflect metabolic variability within a given transcriptional dataset.
 
-Note, that it may take a long time to derive metabolic modules by
-`gamClustering()` function (tens of minutes).
+Note, that it may take a long time to derive metabolic modules by `gamClustering()` function (tens of minutes).
+
+There is a set of parameters which determine the size and number of your final modules. We recommend you to start with the default settings, however you can adjust them based on your own preferences:
+
+1. If you consider final modules to bee too small or too big and it complicates interpretation for you, you can either increase or reduce by 10 units the `max.module.size` parameter. 
+
+2. If among final modules you consider presence of any modules with too similar patterns, you can reduce by 0.1 units the `cor.threshold` parameter. 
+
+3. If among final modules you consider presence of any uninformative modules, you can reduce by 10 times the `p.adj.val.threshold` parameter. 
 
 ```{r, eval = FALSE}
 results <- gamClustering(E.prep = E.prep,
                          network.prep = network.prep,
                          cur.centers = cur.centers,
                          
-                         # start.base = 0.4,
-                         # base.dec = 0,
-                         
                          start.base = 0.5,
-                         base.dec = 0.05,
+                         base.dec = 0.01,
                          max.module.size = 50,
 
                          cor.threshold = 0.8,
-                         p.adj.val.threshold = 0.00001,
+                         p.adj.val.threshold = 0.01,
 
                          batch.solver = seq_batch_solver(solver),
                          work.dir = work.dir,
@@ -265,32 +251,26 @@ results <- gamClustering(E.prep = E.prep,
 
 ### Visualizing and exploring the GAM-clustering results
 
-Each metabolic module is a connected piece of metabolic network whose
-gene expression has correlated expression pattern across all dataset.
+Each metabolic module is a connected piece of metabolic network whose genes expression is correlated across all dataset.
 
-The following functions will help you to visualize and explore the
-obtained results.
+The following functions will help you to visualize and explore the obtained results.
 
 ##### Get graphs of modules:
 
-If you use atom-based network set `rename.atoms` as `TRUE` to rename
-atoms based on their corresponding metabolites.
+If you use atom-based network set `rename.atoms=TRUE` to rename atoms based on their corresponding metabolites.
 
 ```{r, eval = FALSE}
 getGraphs(modules = results$modules,
           network.annotation = network.annotation,
           metabolites.annotation = metabolites.annotation,
-          seed.for.layout = 22,
-          rename.atoms = F,
+          seed.for.layout = 42,
           work.dir = work.dir)
 ```
 
 ##### Get gene tables:
 
-The table contains gene list. Each gene has two descriptive values: i)
-gene's correlation value with the modules pattren and ii) gene's score.
-High score means that this gene's expression is similar to the module's
-pattern and not similar to other modules' patterns.
+The table contains gene list. Each gene has two descriptive values: i) gene's correlation value with the modules pattren and ii) gene's score.
+High score means that this gene's expression is similar to the module's pattern and not similar to other modules' patterns.
 
 ```{r, eval = FALSE}
 m.gene.list <- getGeneTables(modules = results$modules,
@@ -301,158 +281,106 @@ m.gene.list <- getGeneTables(modules = results$modules,
                              work.dir = work.dir)
 ```
 
-##### Get plots of patterns and individual genes plots:
+##### Get plots of patterns and individual genes expression:
 
-You can set any annotation vector to the `data.annotation` parameter.
-
-UNDER RECONSTRUCTION:
-
-For bulk data (common & individual):
+For bulk data:
 
 ```{r, eval = FALSE}
 
 # if use.PCA = TRUE:
-patterns <- data.frame(matrix(ncol=ncol(E), 
-                              nrow = nrow(results$patterns.pos)))
+# patterns <- data.frame(matrix(ncol=ncol(E), nrow = nrow(results$patterns.pos)))
 
 # if use.PCA = FALSE:
-# patterns <- results$patterns.pos
-
-# annotation <- data.frame(annotation = data.annotation)
-# rownames(annotation) <- colnames(patterns)
+patterns <- results$patterns.pos
 
 for (i in seq_along(m.gene.list)) {
   
   # uncomment if use.PCA = TRUE:
-  patterns[i, ] <- getCenter(E, m.gene.list[[i]])
+  # patterns[i, ] <- getCenter(E, m.gene.list[[i]])
   
   heatmap <- E[m.gene.list[[i]], , drop=F]
-  # rownames(heatmap) <- network.annotation$genes[rownames(heatmap)]$symbol
+
   pheatmap::pheatmap(
     normalize.rows(heatmap),
     cluster_rows=F, cluster_cols=F,
     file=sprintf("%s/m.%s.genes.png", work.dir, i),
     width=10, height=5,
     show_rownames=T, show_colnames=T)
-    # annotation_col = annotation)
-  
-  # do it by geseca's:
-  fgsea::plotCoregulationProfile(m.gene.list[[i]], E)
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes_gsc.png", work.dir, i), 
-                  width = 25, 
-                  height = 7)
-
 }
 
 pheatmap::pheatmap(
-  normalize.rows(patterns), # [, order, drop=F]
+  normalize.rows(patterns),
   cluster_rows=F, cluster_cols=F,
-  file=file.path(work.dir, "m.centers.pdf"),
+  file=file.path(work.dir, "m.patterns.pdf"),
   width=30, height=30,
   show_rownames=T, show_colnames=T)
-  # annotation_col = annotation)
 ```
 
-For single-cell data (common & individual):
+For single-cell data:
 
 ```{r, eval=FALSE}
 library(Seurat)
-library(fgsea) # install latest!
+library(fgsea)
 
 Seurat::DefaultAssay(seurat_object) <- "SCT"
       
 for(i in seq_along(m.gene.list)){
   
   # print individuals:
+  
   Seurat::FeaturePlot(seurat_object, 
                       slot = "data",
-                      reduction = "pumap",
+                      reduction = "umap",
                       features = m.gene.list[[i]],
                       ncol = 5,
                       combine = T)
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes_sc.png", work.dir, i), 
+  
+  ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
                   width = 15, 
                   height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
   
-  # collect for common: 
-  seurat_object@meta.data[[paste0("Module_", i)]] <- colMeans(
-    x = as.matrix(Seurat::GetAssayData(object = seurat_object,
-                             assay = "SCT",
-                             slot = "data")[m.gene.list[[i]], , drop = F]), 
-    na.rm = TRUE)
+  # print pattern:
   
-  # do it by geseca's:
-  plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = "pumap")
+  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = "umap")
   
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes_sc_avg.png", work.dir, i), 
+  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
                   width = 4.5, 
                   height = 4)
 
   } 
-
-# print common:
-Seurat::FeaturePlot(object = seurat_object, 
-                    features = paste0("Module_", seq_along(m.gene.list)), 
-                    reduction = "pumap",
-                    ncol = 5,
-                    cols = c("darkblue", "cyan", "yellow",  "red", "red", "darkred", "coral4"))
-
-ggplot2::ggsave(file = file.path(work.dir, "m.centers_sc.pdf"),
-                width = 15,
-                height = round(length(m.gene.list) / 5)*2 + 1)
 ```
 
-For spatial data (common & individual):
+For spatial data:
 
 ```{r, eval=FALSE}
 library(Seurat)
-library(fgsea) # install latest!
+library(fgsea)
 
 for(i in 1:length(m.gene.list)){
+  
+  # print individuals:
   
   Seurat::SpatialFeaturePlot(seurat_object, 
                              features = m.gene.list[[i]],
                              ncol = 8)
   
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes_sc.png", work.dir, i),
+  ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i),
                   width = 18,
                   height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
   
-  # do it by geseca's:
-  plotCoregulationProfileSpatial(m.gene.list[[i]], seurat_object)
+  # print pattern:
+
+  fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], seurat_object)
   
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes_sc_avg.png", work.dir, i),
+  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i),
                   width = 4.5,
                   height = 4)
 }
-
-# altogether <- plotCoregulationProfileSpatial(m.gene.list, seurat_object)
-```
-
-The example of modules patterns is shown on the following heatmap below.
-
-For the pattern highlighted with the green box, graph (produced by
-`getGraphs()`) and genes heatmap (produced by `getHeatmaps()`) are also
-shown below.
-
-```{r centers, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
-knitr::include_graphics("inst/vignette-data/centers.png")
-```
-
-```{r graphANDheatmap, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
-knitr::include_graphics("inst/vignette-data/graphANDheatmap.png")
 ```
 
 ##### Get tables and plots with annotation of modules:
 
-Functional annotation of obtained modules is done based on KEGG and
-Reactome canonical metabolic pathways.
-
-In the function `heatmapModulesAnnotation()` the `threshold` parameter
-allows to visualize pathways containing at least exact percent of genes
-from the module (currently only pathways with \>10% genes are
-visualized).
+Functional annotation of obtained modules is done based on KEGG and Reactome canonical metabolic pathways.
 
 ```{r, eval = FALSE}
 getAnnotationTables(network.annotation = network.annotation,
@@ -460,42 +388,20 @@ getAnnotationTables(network.annotation = network.annotation,
                     work.dir = work.dir)
 
 getAnnotationHeatmap(work.dir = work.dir, 
-                     threshold = 0.05, 
                      file_name = "Modules_heatmap.png")
-```
-
-The example of the content of the annotation file derived for the
-example module is shown above.
-
-```{r, eval=FALSE, echo = FALSE}
-data.table::fread("inst/vignette-data/m.5.pathways.tsv")
 ```
 
 ##### Compare modules obtained in different runs:
 
-You may also compare two results of running GAM-clustering on the same
-dataset (e.g. runs with different parameters) or compare two results of
-running GAM-clustering on different datasets (set `same.data` parameter
-to `FALSE` in that case).
+You may also compare two results of running GAM-clustering on the same dataset (e.g. runs with different parameters) or compare two results of running GAM-clustering on different datasets (then set `same.data=FALSE`).
 
 ```{r, eval=FALSE, eval = FALSE}
 modulesSimilarity(dir1 = work.dir,
-                  dir2 = "/mnt/tank/scratch/againullina/testdata/test2_branch/",
+                  dir2 = old.work.dir,
                   name1 = "new",
                   name2 = "old",
                   same.data = TRUE,
                   use.genes.with.pos.score = TRUE,
                   work.dir = work.dir,
-                  file.name = "2-3.png")
-```
-
-The example heatmap below shows comparison of two runs with different
-numbers of modules (9 and 16). In round brackets the number of genes in
-each module is represented. Each cell of heatmap shows the number of
-genes that intersect in these two modules. The left heatmap consider all
-genes from modules, the right heatmap -- only genes with positive score
-(genes which are more important in the module).
-
-```{r comparison, eval=FALSE, echo=FALSE, fig.cap="", out.width = '100%'}
-knitr::include_graphics("inst/vignette-data/comparison.png")
+                  file.name = "comparison.png")
 ```

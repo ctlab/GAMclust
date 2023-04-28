@@ -1621,18 +1621,18 @@ display: none;
 
 <h1 class="title toc-ignore"><a href="http://artyomovlab.wustl.edu/immgen-met/">GAM-clustering</a>
 Tutorial Notebook</h1>
-<h4 class="date">2023/01/27</h4>
+<h4 class="date">2023/04/28</h4>
 
 </div>
 
 
 <p>Required packages to be installed:</p>
-<pre class="r"><code>install.packages(&quot;mwcsr&quot;)
-install.packages(&quot;fgsea&quot;)
+<pre class="r"><code>devtools::install_github(&quot;ctlab/fgsea&quot;)
 devtools::install_github(&quot;ctlab/gatom&quot;)
+devtools::install_github(&quot;ctlab/mwcsr&quot;)
 
-library(gatom)
 library(fgsea)
+library(gatom)
 library(data.table)
 # library(GAMclust)
 devtools::load_all(getwd())
@@ -1659,48 +1659,54 @@ metabolites.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publ
 
 # Rhea:
 
-network &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.rhea.rds&quot;))
+# network &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.rhea.rds&quot;))
 
-metabolites.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.rhea.db.rds&quot;))</code></pre>
+# metabolites.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.rhea.db.rds&quot;))</code></pre>
 <ol start="3" style="list-style-type: decimal">
 <li>load species-specific network annotation:
-<code>org.Mm.eg.gatom.anno</code> for mouse data,
-<code>org.Rn.eg.gatom.anno</code> for rat data and
-<code>org.Hs.eg.gatom.anno</code> for human data (network annotation is
+<code>org.Hs.eg.gatom.anno</code> for human data or
+<code>org.Mm.eg.gatom.anno</code> for mouse data (network annotation is
 the same for both networks);</li>
 </ol>
-<pre class="r"><code># mouse:
+<pre class="r"><code># human:
+
+network.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds&quot;))
+
+# mouse:
 
 network.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds&quot;))
 
 # rat:
 
-network.annotation &lt;- readRDS(&quot;org.Rn.eg.gatom.anno.rds&quot;)
-
-# human:
-
-network.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds&quot;))</code></pre>
+# network.annotation &lt;- readRDS(&quot;org.Rn.eg.gatom.anno.rds&quot;)</code></pre>
 <ol start="4" style="list-style-type: decimal">
 <li>load provided list of metabolites that should not be considered
 during the analysis as connections between reactions (e.g., CO2, HCO3-,
 etc);</li>
 </ol>
-<pre class="r"><code>met.to.filter &lt;- data.table::fread(system.file(&quot;mets2mask_MashaE_now.lst&quot;, package=&quot;GAMclust&quot;))$ID</code></pre>
+<pre class="r"><code>met.to.filter &lt;- data.table::fread(system.file(&quot;mets2mask.lst&quot;, package=&quot;GAMclust&quot;))$ID</code></pre>
 <ol start="5" style="list-style-type: decimal">
-<li>initialize SMGWCS solver (we recommend to use here heuristic
+<li>initialize SMGWCS solver: we recommend to use here either heuristic
 relax-and-cut solver <code>rnc_solver</code> from <code>mwcsr</code>
-package (check its <a href="https://rdrr.io/cran/mwcsr/f/vignettes/tutorial.Rmd">official
-documentation</a> for more options);</li>
+package or to install proprietary <a href="https://www.ibm.com/products/ilog-cplex-optimization-studio/cplex-optimizer">CPLEX
+solver</a> (free for academy) on your computer (find more info in
+<code>mwcsr</code>’s <a href="https://github.com/ctlab/mwcsr">official
+documentation</a> regarding both approaches);</li>
 </ol>
-<pre class="r"><code># solver &lt;- mwcsr::rnc_solver()
-cplex.dir &lt;- &quot;/opt/ibm/ILOG/CPLEX_Studio1271&quot;
+<pre class="r"><code># relax-and-cut solver:
+
+# solver &lt;- mwcsr::rnc_solver()
+
+# CPLEX SOLVER:
+
 # cplex.dir &lt;- &quot;/nfs/home/againullina/lib/sgmwcs/private-libraries/CPLEX_Studio1271&quot;
+cplex.dir &lt;- &quot;/opt/ibm/ILOG/CPLEX_Studio1271&quot;
 solver &lt;- mwcsr::virgo_solver(cplex_dir = cplex.dir)</code></pre>
 <ol start="6" style="list-style-type: decimal">
 <li>set working directory where the results will be saved to.</li>
 </ol>
 <pre class="r"><code># work.dir &lt;- &quot;/mnt/tank/scratch/againullina/testdata/tms_delCor2_10-5_0.5-0.05&quot;
-work.dir &lt;- &quot;~/Documents/4projects/nets/GAM-clustering/runs/tms_delCor2_10-5_0.5-0.05&quot;
+work.dir &lt;- &quot;~/Documents/4projects/nets/GAM-clustering/runs/test&quot;
 dir.create(work.dir, showWarnings = F, recursive = T)</code></pre>
 <ol start="7" style="list-style-type: decimal">
 <li>TEMPORARY: collecting logs while developing the tool.</li>
@@ -1716,53 +1722,61 @@ sink(log_file, type = &quot;message&quot;, append = TRUE)</code></pre>
 <h3>Preparing objects for the analysis</h3>
 <div id="preparing-data" class="section level4">
 <h4>Preparing data</h4>
-<p>GAMclust works with both bulk and single cell RNAseq data.</p>
-<div id="example-of-bulk-rnaseq-data" class="section level5">
-<h5>Example of bulk RNAseq data</h5>
+<p>GAMclust works with bulk, single cell and spatial RNA-seq data.</p>
+<p>If single cell and spatial RNA-seq data were processed by <a href="https://satijalab.org/seurat/articles/essential_commands.html">Seurat</a>
+pipeline, we recommend to use <code>assay=&quot;SCT&quot;</code> and
+<code>slot=&quot;scale.data&quot;</code> for the further analysis. In this case
+during data preprocessing please force either
+<code>residual.features</code> parameter of <code>SCTransform()</code>
+(in case of one-sample data) or <code>nfeatures</code> parameter of
+<code>SelectIntegrationFeatures()</code> (in case of multi-sample data)
+to keep 10,000 genes in <code>scale.data</code> slot. Example for
+spatial data is shown below.</p>
+<div id="example-of-bulk-rna-seq-data" class="section level5">
+<h5>Example of bulk RNA-seq data</h5>
 <pre class="r"><code>load(&quot;/home/octopus/Documents/4projects/immGen/final_objects/243_es.top12k.Rda&quot;)
 E &lt;- Biobase::exprs(es.top12k)
 E[1:3, 1:3]</code></pre>
 </div>
-<div id="example-of-single-cell-rnaseq-data" class="section level5">
-<h5>Example of single cell RNAseq data</h5>
-<p>UNDER THE DEVELOPMENT: If data were processed by <a href="https://satijalab.org/seurat/articles/essential_commands.html">Seurat</a>
-pipeline, we recommend to use <code>assay=SCT</code> and
-<code>slot=scale.data</code> for the further analysis. In this case keep
-top 12,000 genes in <code>scale.data</code> slot during preceding
-preprocessing as shown below:</p>
-<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds&quot;)
-
-genes.avrg &lt;- Matrix::rowMeans(seurat_object@assays$Spatial@data)
-genes.top12k &lt;- names(head(sort(genes.avrg, decreasing = TRUE), 12000))
-seurat_object &lt;- Seurat::SCTransform(seurat_object, 
-                                     assay = &quot;Spatial&quot;, 
-                                     residual.features = genes.top12k, 
-                                     verbose = TRUE)
-
-E &lt;- as.matrix(Seurat::GetAssayData(object = seurat_object,
-                                    assay = &quot;SCT&quot;, # or &quot;RNA&quot;
-                                    slot = &quot;scale.data&quot;)) # &quot;data&quot;
-dim(E)
-E[1:3, 1:3]</code></pre>
-<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/per.rds&quot;)
+<div id="example-of-single-cell-rna-seq-data" class="section level5">
+<h5>Example of single cell RNA-seq data</h5>
+<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/home/octopus/Documents/4projects/idb/1_aggression/subset_PE/per.rds&quot;)
 
 seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/tms12k.rds&quot;)
 
 E &lt;- as.matrix(Seurat::GetAssayData(object = seurat_object,
-                                    assay = &quot;SCT&quot;, # or &quot;RNA&quot;
-                                    slot = &quot;scale.data&quot;)) # &quot;data&quot;
-dim(E)
+                                    assay = &quot;SCT&quot;,
+                                    slot = &quot;scale.data&quot;))
+
+nrow(E) # ! make sure this value is equal to 10000
+
 E[1:3, 1:3]</code></pre>
-<p>In prepareData() we recommend to set <code>use.PCA=TRUE</code> if you
-use large-scale singe cell RNAseq data (more than 1,000 cells) to
-accelerate the calculations.</p>
-<p>We also recommend to keep only top 12,000 most expressed genes to
-filter out genes with low noisy expression by setting
-<code>keep.top.genes=12000</code> for robust analysis. However, you may
-keep more or less genes, if required.</p>
+</div>
+<div id="example-of-spatial-rna-seq-data" class="section level5">
+<h5>Example of spatial RNA-seq data</h5>
+<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds&quot;)
+
+genes.avrg &lt;- Matrix::rowMeans(seurat_object@assays$Spatial@data)
+genes.top10k &lt;- names(head(sort(genes.avrg, decreasing = TRUE), 10000))
+seurat_object &lt;- Seurat::SCTransform(seurat_object, 
+                                     assay = &quot;Spatial&quot;, 
+                                     residual.features = genes.top10k, 
+                                     verbose = TRUE)
+
+E &lt;- as.matrix(Seurat::GetAssayData(object = seurat_object,
+                                    assay = &quot;SCT&quot;,
+                                    slot = &quot;scale.data&quot;))
+
+nrow(E) # ! make sure this value is equal to 10000
+
+E[1:3, 1:3]</code></pre>
+<p>Genes in your dataset may be named as Symbol, Entrez, Ensembl or
+RefSeq IDs. One of these names should be specified as value of
+<code>gene.id.type</code> parameter in <code>prepareData()</code>.</p>
+<p>If you analyse singe cell or spatial RNA-seq data, please set
+<code>use.PCA=TRUE</code> in <code>prepareData()</code>.</p>
 <pre class="r"><code>E.prep &lt;- prepareData(E = E,
                       gene.id.type = &quot;Symbol&quot;,
-                      keep.top.genes = 12000,
                       use.PCA = TRUE,
                       use.PCA.n = 50,
                       network.annotation = network.annotation)
@@ -1772,13 +1786,10 @@ E.prep[1:3, 1:3]</code></pre>
 </div>
 <div id="preparing-network" class="section level4">
 <h4>Preparing network</h4>
-<p>The <code>prepareNetwork()</code> function predefines the structure
-of the final metabolic modules. At your choice, vertices can be
-represented either as <code>metabolites</code> or as <code>atoms</code>
-(by the <code>topology</code> parameter).</p>
+<p>The <code>prepareNetwork()</code> function defines the structure of
+the final metabolic modules.</p>
 <pre class="r"><code>network.prep &lt;- prepareNetwork(E = E.prep,
                                network = network,
-                               topology = &quot;metabolites&quot;,
                                met.to.filter = met.to.filter,
                                network.annotation = network.annotation)</code></pre>
 </div>
@@ -1786,7 +1797,7 @@ represented either as <code>metabolites</code> or as <code>atoms</code>
 <h4>Preclustering</h4>
 <p>The <code>preClustering()</code> function defines initial patterns
 using k-medoids clustering on gene expression matrix. It is strongly
-recommended to do initial clustering for no less than 32 clusters.</p>
+recommended to do initial clustering with no less than 32 clusters.</p>
 <p>You can visualize the initial heatmap as shown below.</p>
 <pre class="r"><code>cur.centers &lt;- preClustering(E.prep = E.prep,
                              network.prep = network.prep,
@@ -1810,19 +1821,30 @@ specific subnetworks (also called metabolic modules) that reflect
 metabolic variability within a given transcriptional dataset.</p>
 <p>Note, that it may take a long time to derive metabolic modules by
 <code>gamClustering()</code> function (tens of minutes).</p>
+<p>There is a set of parameters which determine the size and number of
+your final modules. We recommend you to start with the default settings,
+however you can adjust them based on your own preferences:</p>
+<ol style="list-style-type: decimal">
+<li><p>If you consider final modules to bee too small or too big and it
+complicates interpretation for you, you can either increase or reduce by
+10 units the <code>max.module.size</code> parameter.</p></li>
+<li><p>If among final modules you consider presence of any modules with
+too similar patterns, you can reduce by 0.1 units the
+<code>cor.threshold</code> parameter.</p></li>
+<li><p>If among final modules you consider presence of any uninformative
+modules, you can reduce by 10 times the <code>p.adj.val.threshold</code>
+parameter.</p></li>
+</ol>
 <pre class="r"><code>results &lt;- gamClustering(E.prep = E.prep,
                          network.prep = network.prep,
                          cur.centers = cur.centers,
                          
-                         # start.base = 0.4,
-                         # base.dec = 0,
-                         
                          start.base = 0.5,
-                         base.dec = 0.05,
+                         base.dec = 0.01,
                          max.module.size = 50,
 
                          cor.threshold = 0.8,
-                         p.adj.val.threshold = 0.00001,
+                         p.adj.val.threshold = 0.01,
 
                          batch.solver = seq_batch_solver(solver),
                          work.dir = work.dir,
@@ -1834,20 +1856,17 @@ metabolic variability within a given transcriptional dataset.</p>
 <div id="visualizing-and-exploring-the-gam-clustering-results" class="section level3">
 <h3>Visualizing and exploring the GAM-clustering results</h3>
 <p>Each metabolic module is a connected piece of metabolic network whose
-gene expression has correlated expression pattern across all
-dataset.</p>
+genes expression is correlated across all dataset.</p>
 <p>The following functions will help you to visualize and explore the
 obtained results.</p>
 <div id="get-graphs-of-modules" class="section level5">
 <h5>Get graphs of modules:</h5>
-<p>If you use atom-based network set <code>rename.atoms</code> as
-<code>TRUE</code> to rename atoms based on their corresponding
-metabolites.</p>
+<p>If you use atom-based network set <code>rename.atoms=TRUE</code> to
+rename atoms based on their corresponding metabolites.</p>
 <pre class="r"><code>getGraphs(modules = results$modules,
           network.annotation = network.annotation,
           metabolites.annotation = metabolites.annotation,
-          seed.for.layout = 22,
-          rename.atoms = F,
+          seed.for.layout = 42,
           work.dir = work.dir)</code></pre>
 </div>
 <div id="get-gene-tables" class="section level5">
@@ -1863,166 +1882,116 @@ module’s pattern and not similar to other modules’ patterns.</p>
                              network.annotation = network.annotation,
                              work.dir = work.dir)</code></pre>
 </div>
-<div id="get-plots-of-patterns-and-individual-genes-plots" class="section level5">
-<h5>Get plots of patterns and individual genes plots:</h5>
-<p>You can set any annotation vector to the <code>data.annotation</code>
-parameter.</p>
-<p>UNDER RECONSTRUCTION:</p>
-<p>For bulk data (common &amp; individual):</p>
+<div id="get-plots-of-patterns-and-individual-genes-expression" class="section level5">
+<h5>Get plots of patterns and individual genes expression:</h5>
+<p>For bulk data:</p>
 <pre class="r"><code># if use.PCA = TRUE:
-patterns &lt;- data.frame(matrix(ncol=ncol(E), 
-                              nrow = nrow(results$patterns.pos)))
+# patterns &lt;- data.frame(matrix(ncol=ncol(E), nrow = nrow(results$patterns.pos)))
 
 # if use.PCA = FALSE:
-# patterns &lt;- results$patterns.pos
-
-# annotation &lt;- data.frame(annotation = data.annotation)
-# rownames(annotation) &lt;- colnames(patterns)
+patterns &lt;- results$patterns.pos
 
 for (i in seq_along(m.gene.list)) {
   
   # uncomment if use.PCA = TRUE:
-  patterns[i, ] &lt;- getCenter(E, m.gene.list[[i]])
+  # patterns[i, ] &lt;- getCenter(E, m.gene.list[[i]])
   
   heatmap &lt;- E[m.gene.list[[i]], , drop=F]
-  # rownames(heatmap) &lt;- network.annotation$genes[rownames(heatmap)]$symbol
+
   pheatmap::pheatmap(
     normalize.rows(heatmap),
     cluster_rows=F, cluster_cols=F,
     file=sprintf(&quot;%s/m.%s.genes.png&quot;, work.dir, i),
     width=10, height=5,
     show_rownames=T, show_colnames=T)
-    # annotation_col = annotation)
-  
-  # do it by geseca&#39;s:
-  fgsea::plotCoregulationProfile(m.gene.list[[i]], E)
-  
-  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes_gsc.png&quot;, work.dir, i), 
-                  width = 25, 
-                  height = 7)
-
 }
 
 pheatmap::pheatmap(
-  normalize.rows(patterns), # [, order, drop=F]
+  normalize.rows(patterns),
   cluster_rows=F, cluster_cols=F,
-  file=file.path(work.dir, &quot;m.centers.pdf&quot;),
+  file=file.path(work.dir, &quot;m.patterns.pdf&quot;),
   width=30, height=30,
-  show_rownames=T, show_colnames=T)
-  # annotation_col = annotation)</code></pre>
-<p>For single-cell data (common &amp; individual):</p>
+  show_rownames=T, show_colnames=T)</code></pre>
+<p>For single-cell data:</p>
 <pre class="r"><code>library(Seurat)
-library(fgsea) # install latest!
+library(fgsea)
 
 Seurat::DefaultAssay(seurat_object) &lt;- &quot;SCT&quot;
       
 for(i in seq_along(m.gene.list)){
   
   # print individuals:
+  
   Seurat::FeaturePlot(seurat_object, 
                       slot = &quot;data&quot;,
-                      reduction = &quot;pumap&quot;,
+                      reduction = &quot;umap&quot;,
                       features = m.gene.list[[i]],
                       ncol = 5,
                       combine = T)
-  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes_sc.png&quot;, work.dir, i), 
+  
+  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes.png&quot;, work.dir, i), 
                   width = 15, 
                   height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
   
-  # collect for common: 
-  seurat_object@meta.data[[paste0(&quot;Module_&quot;, i)]] &lt;- colMeans(
-    x = as.matrix(Seurat::GetAssayData(object = seurat_object,
-                             assay = &quot;SCT&quot;,
-                             slot = &quot;data&quot;)[m.gene.list[[i]], , drop = F]), 
-    na.rm = TRUE)
+  # print pattern:
   
-  # do it by geseca&#39;s:
-  plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = &quot;pumap&quot;)
+  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = &quot;umap&quot;)
   
-  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes_sc_avg.png&quot;, work.dir, i), 
+  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.pattern.png&quot;, work.dir, i), 
                   width = 4.5, 
                   height = 4)
 
-  } 
-
-# print common:
-Seurat::FeaturePlot(object = seurat_object, 
-                    features = paste0(&quot;Module_&quot;, seq_along(m.gene.list)), 
-                    reduction = &quot;pumap&quot;,
-                    ncol = 5,
-                    cols = c(&quot;darkblue&quot;, &quot;cyan&quot;, &quot;yellow&quot;,  &quot;red&quot;, &quot;red&quot;, &quot;darkred&quot;, &quot;coral4&quot;))
-
-ggplot2::ggsave(file = file.path(work.dir, &quot;m.centers_sc.pdf&quot;),
-                width = 15,
-                height = round(length(m.gene.list) / 5)*2 + 1)</code></pre>
-<p>For spatial data (common &amp; individual):</p>
+  } </code></pre>
+<p>For spatial data:</p>
 <pre class="r"><code>library(Seurat)
-library(fgsea) # install latest!
+library(fgsea)
 
 for(i in 1:length(m.gene.list)){
+  
+  # print individuals:
   
   Seurat::SpatialFeaturePlot(seurat_object, 
                              features = m.gene.list[[i]],
                              ncol = 8)
   
-  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes_sc.png&quot;, work.dir, i),
+  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes.png&quot;, work.dir, i),
                   width = 18,
                   height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
   
-  # do it by geseca&#39;s:
-  plotCoregulationProfileSpatial(m.gene.list[[i]], seurat_object)
+  # print pattern:
+
+  fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], seurat_object)
   
-  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.genes_sc_avg.png&quot;, work.dir, i),
+  ggplot2::ggsave(file = sprintf(&quot;%s/m.%s.pattern.png&quot;, work.dir, i),
                   width = 4.5,
                   height = 4)
-}
-
-# altogether &lt;- plotCoregulationProfileSpatial(m.gene.list, seurat_object)</code></pre>
-<p>The example of modules patterns is shown on the following heatmap
-below.</p>
-<p>For the pattern highlighted with the green box, graph (produced by
-<code>getGraphs()</code>) and genes heatmap (produced by
-<code>getHeatmaps()</code>) are also shown below.</p>
+}</code></pre>
 </div>
 <div id="get-tables-and-plots-with-annotation-of-modules" class="section level5">
 <h5>Get tables and plots with annotation of modules:</h5>
 <p>Functional annotation of obtained modules is done based on KEGG and
 Reactome canonical metabolic pathways.</p>
-<p>In the function <code>heatmapModulesAnnotation()</code> the
-<code>threshold</code> parameter allows to visualize pathways containing
-at least exact percent of genes from the module (currently only pathways
-with &gt;10% genes are visualized).</p>
 <pre class="r"><code>getAnnotationTables(network.annotation = network.annotation,
                     nets = results$nets,
                     work.dir = work.dir)
 
 getAnnotationHeatmap(work.dir = work.dir, 
-                     threshold = 0.05, 
                      file_name = &quot;Modules_heatmap.png&quot;)</code></pre>
-<p>The example of the content of the annotation file derived for the
-example module is shown above.</p>
 </div>
 <div id="compare-modules-obtained-in-different-runs" class="section level5">
 <h5>Compare modules obtained in different runs:</h5>
 <p>You may also compare two results of running GAM-clustering on the
 same dataset (e.g. runs with different parameters) or compare two
-results of running GAM-clustering on different datasets (set
-<code>same.data</code> parameter to <code>FALSE</code> in that
-case).</p>
+results of running GAM-clustering on different datasets (then set
+<code>same.data=FALSE</code>).</p>
 <pre class="r"><code>modulesSimilarity(dir1 = work.dir,
-                  dir2 = &quot;/mnt/tank/scratch/againullina/testdata/test2_branch/&quot;,
+                  dir2 = old.work.dir,
                   name1 = &quot;new&quot;,
                   name2 = &quot;old&quot;,
                   same.data = TRUE,
                   use.genes.with.pos.score = TRUE,
                   work.dir = work.dir,
-                  file.name = &quot;2-3.png&quot;)</code></pre>
-<p>The example heatmap below shows comparison of two runs with different
-numbers of modules (9 and 16). In round brackets the number of genes in
-each module is represented. Each cell of heatmap shows the number of
-genes that intersect in these two modules. The left heatmap consider all
-genes from modules, the right heatmap – only genes with positive score
-(genes which are more important in the module).</p>
+                  file.name = &quot;comparison.png&quot;)</code></pre>
 </div>
 </div>
 
