@@ -79,7 +79,7 @@ prepareData <- function(
 prepareNetwork <- function(
     E,
     network,
-    topology = c("atoms", "metabolites"),
+    topology = c("metabolites", "atoms"),
     met.to.filter = data.table::fread(system.file("mets2mask.lst", package="GAMclust"))$ID,
     network.annotation){
   
@@ -352,15 +352,7 @@ gamClustering <- function(E.prep,
       
       revs[[k]] <- rev
       
-      # 3. UPDATE PARAMETERS
-      
-      if (max(sapply(ms_mods, function(m) ulength(igraph::E(m)$gene))) > max.module.size) {
-        base <- base - base.dec
-      }
-      
-      iteration <- iteration + 1
-      
-      # 4. DID MODULES CONVERGE, i.e. CAN WE LEAVE THE SECOND LOOP
+      # 3. DID MODULES CONVERGE, i.e. CAN WE LEAVE THE SECOND LOOP
       
       # previous iterations, in which there was the same number of modules:
       revsToCheck <- revs[sapply(revs[seq_len(k-1)], function(rev) nrow(rev$centers.pos)) 
@@ -372,8 +364,12 @@ gamClustering <- function(E.prep,
         diff <- min(sapply(revsToCheck,
                            function(prevRev) max(abs(rev$centers.pos - prevRev$centers.pos))))
       }
+      
+      # 4. UPDATE PARAMETERS
 
       cur.centers <- rev$centers.pos
+      
+      iteration <- iteration + 1
       
       if (verbose) {messagef("Max diff: %s", round(diff, 2))}
       
@@ -385,14 +381,24 @@ gamClustering <- function(E.prep,
 
     if (length(rev$modules) == 1) {break}
     
-    # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF (i) CORRELATED & (ii) UNINFORMATIVE ONES
+    # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF 
     
-    # (i) correlated: 
+    # (i) TOO BIG ONES:
+    
+    biggest.one <- max(sapply(ms_mods, function(m) ulength(igraph::E(m)$gene))) 
+    
+    if (biggest.one > max.module.size) {
+      base <- base - base.dec
+    }
+    
+    # (ii) CORRELATED ONES: 
+    
     centers.cors <- cor(t(cur.centers))
     diag(centers.cors) <- 0
     correlation.max <- apply(centers.cors, 1, max, na.rm=T)
     
     if (any(correlation.max > cor.threshold)) {
+      
       messagef("Max cor exceeded %s: %s", cor.threshold, round(max(correlation.max), 2))
       max.cor.mod1 <- which.max(correlation.max) 
       max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
@@ -401,7 +407,8 @@ gamClustering <- function(E.prep,
                                 E.prep = E.prep, ms_mods = ms_mods)
     } else {
       
-      # (ii) uninformative:
+      # (iii) or UNINFORMATIVE ONES:
+      
       gesecaRes <- doGeseca(E.prep = E.prep,
                             network.prep = network.prep,
                             network.annotation = network.annotation,
@@ -413,15 +420,17 @@ gamClustering <- function(E.prep,
       good <- gesecaRes$pathway[which(gesecaRes$padj < p.adj.val.threshold)]
       bad <- rownames(cur.centers)[!rownames(cur.centers) %in% good]
       
-      if (length(bad) == 0) {break} 
-      
-      centers.cors <- cor(t(cur.centers))
-      diag(centers.cors) <- 0
-      max.cor.mod1 <- as.integer(gsub("c.pos", "", bad[which.max(apply(centers.cors, 1, max, na.rm=T)[bad])]))
-      max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
-      cur.centers <- updCenters(cur.centers = cur.centers, 
-                                m1 = max.cor.mod1, m2 = max.cor.mod2, 
-                                E.prep = E.prep, ms_mods = ms_mods)
+      if (length(bad) == 0 & biggest.one <= max.module.size) {break} 
+      if (length(bad) != 0) {
+        
+        centers.cors <- cor(t(cur.centers))
+        diag(centers.cors) <- 0
+        max.cor.mod1 <- as.integer(gsub("c.pos", "", bad[which.max(apply(centers.cors, 1, max, na.rm=T)[bad])]))
+        max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
+        cur.centers <- updCenters(cur.centers = cur.centers, 
+                                  m1 = max.cor.mod1, m2 = max.cor.mod2, 
+                                  E.prep = E.prep, ms_mods = ms_mods)
+      }
     }
     
     # keep expressions devoted to sizes of modules:

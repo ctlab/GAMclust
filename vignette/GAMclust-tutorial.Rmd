@@ -235,11 +235,11 @@ results <- gamClustering(E.prep = E.prep,
                          cur.centers = cur.centers,
                          
                          start.base = 0.5,
-                         base.dec = 0.01,
+                         base.dec = 0.05,
                          max.module.size = 50,
 
                          cor.threshold = 0.8,
-                         p.adj.val.threshold = 0.01,
+                         p.adj.val.threshold = 0.00001,
 
                          batch.solver = seq_batch_solver(solver),
                          work.dir = work.dir,
@@ -397,7 +397,7 @@ You may also compare two results of running GAM-clustering on the same dataset (
 
 ```{r, eval=FALSE, eval = FALSE}
 modulesSimilarity(dir1 = work.dir,
-                  dir2 = old.work.dir,
+                  dir2 = "/home/octopus/Documents/4projects/immGen/GAM-clustering/10_32_04_191021_Todorov_32/",
                   name1 = "new",
                   name2 = "old",
                   same.data = TRUE,
