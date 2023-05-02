@@ -39,7 +39,7 @@ set.seed(42)
 
 First, please load and initialize all objects required for GAM-clustering analysis:
 
-(1) load one of the provided metabolic networks: `network.kegg.rds` is built based on the [KEGG database](https://www.genome.jp/kegg/), `network.rhea.rds` is built based on the [RHEA database](https://www.rhea-db.org/);
+(1) load one of the provided metabolic networks (we recommend to start with KEGG): `network.kegg.rds` is built based on the [KEGG database](https://www.genome.jp/kegg/), `network.rhea.rds` is built based on the [RHEA database](https://www.rhea-db.org/);
 
 (2) load metabolites annotation: `met.kegg.db.rds` for KEGG network and `met.rhea.db.rds` is for RHEA network;
 
@@ -57,7 +57,7 @@ metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications
 # metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.rhea.db.rds"))
 ```
 
-(3) load species-specific network annotation: `org.Hs.eg.gatom.anno` for human data or `org.Mm.eg.gatom.anno` for mouse data (network annotation is the same for both networks);
+(3) load species-specific network annotation: `org.Hs.eg.gatom.anno` for human data or `org.Mm.eg.gatom.anno` for mouse data;
 
 ```{r, eval=FALSE}
 # human:
