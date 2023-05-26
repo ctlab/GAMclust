@@ -79,7 +79,7 @@ network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/sup
 met.to.filter <- data.table::fread(system.file("mets2mask.lst", package="GAMclust"))$ID
 ```
 
-(5) initialize SMGWCS solver: we recommend to use here either heuristic relax-and-cut solver `rnc_solver` from `mwcsr` package or to install proprietary [CPLEX solver](https://www.ibm.com/products/ilog-cplex-optimization-studio/cplex-optimizer) (free for academy) on your computer (find more info in `mwcsr`'s [official documentation](https://github.com/ctlab/mwcsr) regarding both approaches);
+(5) initialize SMGWCS solver: we recommend to use here either heuristic relax-and-cut solver `rnc_solver` from `mwcsr` package or to install proprietary [CPLEX solver](https://www.ibm.com/products/ilog-cplex-optimization-studio) (free for academy) on your computer (find more info in `mwcsr`'s [official documentation](https://github.com/ctlab/mwcsr) regarding both approaches);
 
 ```{r, eval=FALSE}
 # relax-and-cut solver:
