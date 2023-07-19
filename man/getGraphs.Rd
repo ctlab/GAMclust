@@ -8,7 +8,6 @@ getGraphs(
   modules,
   network.annotation,
   metabolites.annotation,
-  rename.atoms = FALSE,
   seed.for.layout = 22,
   work.dir = work.dir
 )
@@ -19,8 +18,6 @@ getGraphs(
 \item{network.annotation}{Metabolic network annotation.}
 
 \item{metabolites.annotation}{Metabolites annotation.}
-
-\item{rename.atoms}{Logical, if using atom based metabolic network rename}
 
 \item{seed.for.layout}{Random seed required for gatom to draw metabolic graph.
 each atom to corresponding metabolite's name}

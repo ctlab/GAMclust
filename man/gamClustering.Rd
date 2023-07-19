@@ -8,15 +8,16 @@ gamClustering(
   E.prep,
   network.prep,
   cur.centers,
-  repeats,
-  batch.solver = seq_batch_solver(solver),
-  max.module.size = 50,
-  start.base = 1,
+  start.base = 0.5,
   base.dec = 0.05,
+  max.module.size = 50,
+  cor.threshold = 0.8,
+  p.adj.val.threshold = 0.001,
+  batch.solver = seq_batch_solver(solver),
+  work.dir,
   show.intermediate.clustering = TRUE,
   verbose = TRUE,
-  collect.stats = TRUE,
-  work.dir
+  collect.stats = TRUE
 )
 }
 \arguments{
@@ -26,25 +27,25 @@ gamClustering(
 
 \item{cur.centers}{Initial patterns produced by `preClustering()` function.}
 
-\item{repeats}{Here you may collapse biological replicas by providung vector with repeated sample names. Otherwise, just use vector with unique sample names.}
+\item{start.base}{The parameter which influences modules sizes.}
 
-\item{batch.solver}{Solver for SGMWCS problem.}
+\item{base.dec}{The value by which `base` parameter should be reduced if some module's size is bigger that `max.module.size`.}
 
 \item{max.module.size}{Maximal number of unique genes in the final module.}
 
-\item{start.base}{The distance to the fake pattern which influences `max.module.size` parameter. Equal to 1 at the beginning.}
+\item{cor.threshold}{Threshold for correlation between module patterns.}
 
-\item{base.dec}{The value by which `base` parameter should be reduced if some module's size is bigger that `max.module.size`.}
+\item{p.adj.val.threshold}{Padj threshold of geseca score for final modules.}
+
+\item{batch.solver}{Solver for SGMWCS problem.}
+
+\item{work.dir}{Working directory where results should be saved.}
 
 \item{show.intermediate.clustering}{Whether to show or not heatmap of intermideate clusters.}
 
 \item{verbose}{Verbose running.}
 
 \item{collect.stats}{Whether to save or not running statistics.}
-
-\item{work.dir}{Working directory where results should be saved.}
-
-\item{E}{Expression matrix.}
 }
 \value{
 results$modules -- Metabolic modules.

@@ -7,14 +7,14 @@
 prepareNetwork(
   E,
   network,
-  topology = c("atoms", "metabolites"),
+  topology = c("metabolites", "atoms"),
   met.to.filter = data.table::fread(system.file("mets2mask.lst", package =
     "GAMclust"))$ID,
   network.annotation
 )
 }
 \arguments{
-\item{E}{Expression matrix after the prepareData() function.}
+\item{E}{Expression matrix after the `prepareData()` function.}
 
 \item{network}{Metabolic network.}
 

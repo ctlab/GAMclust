@@ -5,30 +5,21 @@
 \title{Defining initial patterns}
 \usage{
 preClustering(
-  E,
   E.prep,
   network.prep,
-  repeats,
   initial.number.of.clusters = 32,
-  show.initial.clustering.on.PCA = TRUE,
-  show.initial.clustering.on.GE = FALSE,
-  network.annotation
+  network.annotation,
+  use.ICA = FALSE
 )
 }
 \arguments{
-\item{E}{Expression matrix.}
+\item{E.prep}{Expression matrix after the `prepareData()` function.}
 
-\item{E.prep}{Expression matrix after the prepareData() function.}
-
-\item{network.prep}{Network edge table driven from prepareNetwork() function.}
-
-\item{repeats}{Here you may collapse biological replicas by providung vector with repeated sample names. Otherwise, just use vector with unique sample names.}
+\item{network.prep}{Network edge table driven from `prepareNetwork()` function.}
 
 \item{initial.number.of.clusters}{The number of clusters for the initial approximation of modules.}
 
 \item{network.annotation}{Metabolic network annotation.}
-
-\item{show.initial.clustering}{Whether to show or not heatmap of initial clusters.}
 }
 \value{
 Initial patterns.

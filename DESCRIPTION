@@ -34,7 +34,9 @@ Imports:
     limma,
     mwcsr,
     irlba,
-    pheatmap
+    pheatmap,
+    Rgraphviz,
+    rsvg
 Suggests:
     AnnotationDbi,
     org.Mm.eg.db,
