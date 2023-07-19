@@ -39,7 +39,7 @@ updCenters <- function(cur.centers, m1, m2, E.prep, ms_mods) {
     unique(c(igraph::E(ms_mods[[m1]])[score > 0]$gene,
              igraph::E(ms_mods[[m2]])[score > 0]$gene)))
   
-  cur.centers <- cur.centers[-m2, ] 
+  cur.centers <- cur.centers[-m2, , drop=F]
 }
 
 

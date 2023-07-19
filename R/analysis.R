@@ -379,8 +379,6 @@ gamClustering <- function(E.prep,
 
     } # -------------------------------------------------------------------------------------- SECOND LOOP
 
-    if (length(rev$modules) == 1) {break}
-    
     # 5. IF MODULES CONVERGED, WE CHECK THEM FOR PRESENCE OF 
     
     # (i) TOO BIG ONES:
@@ -432,6 +430,8 @@ gamClustering <- function(E.prep,
                                   E.prep = E.prep, ms_mods = ms_mods)
       }
     }
+    
+    if (nrow(cur.centers) == 1) {break}
     
     # keep expressions devoted to sizes of modules:
     # m.sizes <- sapply(modules, function(m) ulength(igraph::E(m)$gene))
