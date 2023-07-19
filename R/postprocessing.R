@@ -4,7 +4,6 @@
 #' @param network.annotation Metabolic network annotation.
 #' @param metabolites.annotation Metabolites annotation.
 #' @param work.dir Working directory where results should be saved.
-#' @param rename.atoms Logical, if using atom based metabolic network rename
 #' @param seed.for.layout Random seed required for gatom to draw metabolic graph.
 #' each atom to corresponding metabolite's name
 #' @return Results of this function can be seen in work.dir (.pdf, .png and .xgmml files).
@@ -12,7 +11,6 @@
 getGraphs <- function(modules,
                       network.annotation,
                       metabolites.annotation,
-                      rename.atoms = FALSE,
                       seed.for.layout = 22,
                       work.dir = work.dir){
 
@@ -28,17 +26,12 @@ getGraphs <- function(modules,
     igraph::E(m)$pval <- 0.01
     igraph::E(m)$log2FC <- igraph::E(m)$score
     # at the moment it has: name | score | signal | index
+    # take only metabolite id without atom coord
+    igraph::V(m)$label <- sapply(strsplit(igraph::V(m)$name, split = "_"), `[[`, 1)
     # fix 01.04.2022 + [, on = .(metabolite)]
-    igraph::V(m)$label <- metabolites.annotation$metabolites[igraph::V(m)$name, on = .(metabolite)]$metabolite_name
+    igraph::V(m)$label <- metabolites.annotation$metabolites[igraph::V(m)$label, on = .(metabolite)]$metabolite_name
     igraph::V(m)$logPval <- -5
     igraph::V(m)$log2FC <- NA
-
-    if (rename.atoms) {
-      m <- renameAtoms(m,
-                       network = network,
-                       metabolites.annotation = metabolites.annotation)
-      igraph::V(m)$label <- igraph::V(m)$name
-    }
 
     file <- file.path(work.dir, paste0(name, ".dot"))
     gatom::saveModuleToDot(m, file=file, name=name)

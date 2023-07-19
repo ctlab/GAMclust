@@ -353,53 +353,6 @@ compareModulesIndex <- function(dir1, dir2,
 }
 
 
-#' Rename atoms (to human readable format)
-#'
-#' @param g Input graph
-#' @param network Metabolic network with slot `atoms` containing information on
-#' *metabolite* and *element*
-#' @param metabolites.annotation Metabolites annotation.
-#' @return Graph with renamed atoms (original naming can be found as vertices attribute named *atom*)
-#' @export
-renameAtoms <- function(g, network, metabolites.annotation) {
-
-  igraph::V(g)$name_met <- network$atoms[igraph::V(g)$name]$metabolite
-  igraph::V(g)$element <- network$atoms[igraph::V(g)$name]$element
-  # human-friendly names for metabolites
-  igraph::V(g)$name_met <- metabolites.annotation$metabolites[igraph::V(g)$name_met]$metabolite_name
-
-  # rename atoms in vertices
-  vertices <- data.table::as.data.table(igraph::as_data_frame(g, what = "vertices"))
-  vertices <- vertices[, !c("label")]
-  vertices$atom <- stringr::str_replace(vertices$name, "_", "|")
-  vertices <- vertices[, c("met", "atom") := data.table::tstrsplit(atom, "\\|")]
-  vertices <- vertices[, !c("met")]
-  vertices <- vertices[, atom := as.integer(factor(atom, levels = unique(atom))), by = "name_met"]
-  vertices <- vertices[, atom := sprintf("%s (%s%s)", name_met, element, atom), by = "name_met"]
-  data.table::setnames(vertices, c("atom", "name"), c("label", "atom"))
-  vertices <- vertices[, !c("name_met", "element")]
-  data.table::setcolorder(vertices, c("label", colnames(vertices)[which(colnames(vertices) != "label")]))
-
-  # rename from/to of edges based on translated vertices
-  edges <- data.table::as.data.table(igraph::as_data_frame(g, what = "edges"))
-  vertices_as_key <- vertices[, c("atom", "label")]
-  data.table::setkey(vertices_as_key, atom, label)
-  data.table::setkey(edges, to)
-  edges <- vertices_as_key[edges]
-  edges <- edges[, !c("atom")]
-  data.table::setnames(edges, "label", "to")
-  data.table::setkey(edges, from)
-  edges <- vertices_as_key[edges]
-  edges <- edges[, !c("atom")]
-  data.table::setnames(edges, "label", "from")
-
-  g_renamed <- igraph::graph_from_data_frame(as.data.frame(edges), vertices = as.data.frame(vertices), directed = F)
-
-  return(g_renamed)
-
-}
-
-
 # from rUtils package
 collapseBy <- function(es, factor, FUN=median) {
   ranks <- apply(Biobase::exprs(es), 1, FUN)
