@@ -37,8 +37,17 @@ getGraphs <- function(modules,
     gatom::saveModuleToDot(m, file=file, name=name)
     gatom::saveModuleToXgmml(m, name=name, file=file.path(work.dir, paste0(name, ".xgmml")))
     igraph::write_graph(m, file=file.path(work.dir, paste0(name, ".graphml")), format="graphml")
-    system2("neato", c("-Tpdf", "-o", file.path(work.dir, paste0(name, ".pdf")), file), stderr = F)
-    system2("neato", c("-Tpng", "-o", file.path(work.dir, paste0(name, ".png")), file), stderr = F)
+    # system2("neato", c("-Tpdf", "-o", file.path(work.dir, paste0(name, ".pdf")), file), stderr = F)
+    # system2("neato", c("-Tpng", "-o", file.path(work.dir, paste0(name, ".png")), file), stderr = F)
+    # use Rgraphviz instead of command line graphviz
+    mm <- Rgraphviz::agread(file, layoutType="dot", layout=TRUE)
+    Rgraphviz::toFile(mm, layoutType="neato", filename=file.path(work.dir, paste0(name, ".svg")), fileType="svg")
+    tryCatch(
+      rsvg::rsvg_pdf(file.path(work.dir, paste0(name, ".svg")), file.path(work.dir, paste0(name, ".pdf"))),
+      error = function(e) NULL)
+    tryCatch(
+      rsvg::rsvg_png(file.path(work.dir, paste0(name, ".svg")), file.path(work.dir, paste0(name, ".png"))),
+      error = function(e) NULL)
     tryCatch(
       gatom::saveModuleToPdf(module = m, seed = seed.for.layout,
                              file = file.path(work.dir, paste0(name, "_seed", seed.for.layout, ".pdf"))),
