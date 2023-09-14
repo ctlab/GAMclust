@@ -42,7 +42,9 @@ Suggests:
     org.Mm.eg.db,
     reactome.db,
     KEGGREST,
-    Seurat
+    Seurat,
+    Rgraphviz,
+    rsvg
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true

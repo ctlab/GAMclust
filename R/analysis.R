@@ -431,7 +431,10 @@ gamClustering <- function(E.prep,
       }
     }
     
-    if (nrow(cur.centers) == 1) {break}
+    if (nrow(cur.centers) == 1) {
+      messagef("ATTENTION: The reliability of the outputs falls short of our expectations. Need to tune the method's parameters to enhance the overall quality of the results.")
+      break
+      }
     
     # keep expressions devoted to sizes of modules:
     # m.sizes <- sapply(modules, function(m) ulength(igraph::E(m)$gene))

@@ -1644,8 +1644,8 @@ set.seed(42)</code></pre>
 <p>First, please load and initialize all objects required for
 GAM-clustering analysis:</p>
 <ol style="list-style-type: decimal">
-<li><p>load one of the provided metabolic networks:
-<code>network.kegg.rds</code> is built based on the <a href="https://www.genome.jp/kegg/">KEGG database</a>,
+<li><p>load one of the provided metabolic networks (we recommend to
+start with KEGG): <code>network.kegg.rds</code> is built based on the <a href="https://www.genome.jp/kegg/">KEGG database</a>,
 <code>network.rhea.rds</code> is built based on the <a href="https://www.rhea-db.org/">RHEA database</a>;</p></li>
 <li><p>load metabolites annotation: <code>met.kegg.db.rds</code> for
 KEGG network and <code>met.rhea.db.rds</code> is for RHEA
@@ -1665,8 +1665,7 @@ metabolites.annotation &lt;- readRDS(url(&quot;http://artyomovlab.wustl.edu/publ
 <ol start="3" style="list-style-type: decimal">
 <li>load species-specific network annotation:
 <code>org.Hs.eg.gatom.anno</code> for human data or
-<code>org.Mm.eg.gatom.anno</code> for mouse data (network annotation is
-the same for both networks);</li>
+<code>org.Mm.eg.gatom.anno</code> for mouse data;</li>
 </ol>
 <pre class="r"><code># human:
 
@@ -1688,7 +1687,7 @@ etc);</li>
 <ol start="5" style="list-style-type: decimal">
 <li>initialize SMGWCS solver: we recommend to use here either heuristic
 relax-and-cut solver <code>rnc_solver</code> from <code>mwcsr</code>
-package or to install proprietary <a href="https://www.ibm.com/products/ilog-cplex-optimization-studio/cplex-optimizer">CPLEX
+package or to install proprietary <a href="https://www.ibm.com/products/ilog-cplex-optimization-studio">CPLEX
 solver</a> (free for academy) on your computer (find more info in
 <code>mwcsr</code>’s <a href="https://github.com/ctlab/mwcsr">official
 documentation</a> regarding both approaches);</li>
@@ -1699,14 +1698,12 @@ documentation</a> regarding both approaches);</li>
 
 # CPLEX SOLVER:
 
-# cplex.dir &lt;- &quot;/nfs/home/againullina/lib/sgmwcs/private-libraries/CPLEX_Studio1271&quot;
 cplex.dir &lt;- &quot;/opt/ibm/ILOG/CPLEX_Studio1271&quot;
 solver &lt;- mwcsr::virgo_solver(cplex_dir = cplex.dir)</code></pre>
 <ol start="6" style="list-style-type: decimal">
 <li>set working directory where the results will be saved to.</li>
 </ol>
-<pre class="r"><code># work.dir &lt;- &quot;/mnt/tank/scratch/againullina/testdata/tms_delCor2_10-5_0.5-0.05&quot;
-work.dir &lt;- &quot;~/Documents/4projects/nets/GAM-clustering/runs/test&quot;
+<pre class="r"><code>work.dir &lt;- &quot;GAM-clustering/runs/test&quot;
 dir.create(work.dir, showWarnings = F, recursive = T)</code></pre>
 <ol start="7" style="list-style-type: decimal">
 <li>TEMPORARY: collecting logs while developing the tool.</li>
@@ -1734,15 +1731,13 @@ to keep 10,000 genes in <code>scale.data</code> slot. Example for
 spatial data is shown below.</p>
 <div id="example-of-bulk-rna-seq-data" class="section level5">
 <h5>Example of bulk RNA-seq data</h5>
-<pre class="r"><code>load(&quot;/home/octopus/Documents/4projects/immGen/final_objects/243_es.top12k.Rda&quot;)
+<pre class="r"><code>load(&quot;data.Rda&quot;)
 E &lt;- Biobase::exprs(es.top12k)
 E[1:3, 1:3]</code></pre>
 </div>
 <div id="example-of-single-cell-rna-seq-data" class="section level5">
 <h5>Example of single cell RNA-seq data</h5>
-<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/home/octopus/Documents/4projects/idb/1_aggression/subset_PE/per.rds&quot;)
-
-seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/tms12k.rds&quot;)
+<pre class="r"><code>seurat_object &lt;- readRDS(&quot;data.rds&quot;)
 
 E &lt;- as.matrix(Seurat::GetAssayData(object = seurat_object,
                                     assay = &quot;SCT&quot;,
@@ -1754,7 +1749,7 @@ E[1:3, 1:3]</code></pre>
 </div>
 <div id="example-of-spatial-rna-seq-data" class="section level5">
 <h5>Example of spatial RNA-seq data</h5>
-<pre class="r"><code>seurat_object &lt;- readRDS(&quot;/mnt/tank/scratch/againullina/testdata/275_T_seurat.rds&quot;)
+<pre class="r"><code>seurat_object &lt;- readRDS(&quot;data.rds&quot;)
 
 genes.avrg &lt;- Matrix::rowMeans(seurat_object@assays$Spatial@data)
 genes.top10k &lt;- names(head(sort(genes.avrg, decreasing = TRUE), 10000))
@@ -1840,11 +1835,11 @@ parameter.</p></li>
                          cur.centers = cur.centers,
                          
                          start.base = 0.5,
-                         base.dec = 0.01,
+                         base.dec = 0.05,
                          max.module.size = 50,
 
                          cor.threshold = 0.8,
-                         p.adj.val.threshold = 0.01,
+                         p.adj.val.threshold = 0.00001,
 
                          batch.solver = seq_batch_solver(solver),
                          work.dir = work.dir,
@@ -1861,8 +1856,6 @@ genes expression is correlated across all dataset.</p>
 obtained results.</p>
 <div id="get-graphs-of-modules" class="section level5">
 <h5>Get graphs of modules:</h5>
-<p>If you use atom-based network set <code>rename.atoms=TRUE</code> to
-rename atoms based on their corresponding metabolites.</p>
 <pre class="r"><code>getGraphs(modules = results$modules,
           network.annotation = network.annotation,
           metabolites.annotation = metabolites.annotation,
@@ -1985,7 +1978,7 @@ same dataset (e.g. runs with different parameters) or compare two
 results of running GAM-clustering on different datasets (then set
 <code>same.data=FALSE</code>).</p>
 <pre class="r"><code>modulesSimilarity(dir1 = work.dir,
-                  dir2 = old.work.dir,
+                  dir2 = &quot;old_dir&quot;,
                   name1 = &quot;new&quot;,
                   name2 = &quot;old&quot;,
                   same.data = TRUE,
