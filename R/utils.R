@@ -34,10 +34,14 @@ getCenter <- function(gene.exprs,
 
 updCenters <- function(cur.centers, m1, m2, E.prep, ms_mods) {
   
-  cur.centers[m1, ] <- getCenter(
-    E.prep, 
-    unique(c(igraph::E(ms_mods[[m1]])[score > 0]$gene,
-             igraph::E(ms_mods[[m2]])[score > 0]$gene)))
+  genes <- unique(c(igraph::E(ms_mods[[m1]])[score > 0]$gene,
+                    igraph::E(ms_mods[[m2]])[score > 0]$gene))
+  
+  if(length(genes) == 0){
+    cur.centers[m1, ] <- colMeans(cur.centers[c(m1,m2), ])
+  } else {
+    cur.centers[m1, ] <- getCenter(E.prep, genes)
+  }
   
   cur.centers <- cur.centers[-m2, , drop=F]
 }
