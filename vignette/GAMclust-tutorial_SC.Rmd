@@ -1,5 +1,5 @@
 ---
-title: 'GAM-clustering Tutorial Notebook For Reanalysis Of [ImmGen Open Source](http://artyomovlab.wustl.edu/immgen-met/) Bulk RNA-Seq Data'
+title: 'GAM-clustering Tutorial Notebook For Reanalysis Of [Metabolic Tabula Muris Senis](http://artyomovlab.wustl.edu/immgen-met/) Single Cell RNA-Seq Data'
 date: 2023/09/19
 output:
   html_document:
@@ -101,22 +101,34 @@ sink(log_file, type = "message", append = TRUE)
 
 GAMclust works with bulk, single cell and spatial RNA-seq data.
 
-This vignette shows how to process bulk RNA-seq data on the example of [ImmGen Open Source](http://artyomovlab.wustl.edu/immgen-met/) data reanalysis.
+This vignette shows how to process single cell RNA-seq data on the example of [Tabula Muris Senis](http://artyomovlab.wustl.edu/immgen-met/) data reanalysis.
 
-Let's load the data.
+Let's load the data. (If you analyse multi-sample data, after per-sample `SCTransform()` application do not forget to set `nfeatures=10000` in `SelectIntegrationFeatures()`).
 
 ```{r}
-expression_set_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/243_es.top12k.rds"))
-E <- Biobase::exprs(expression_set_object)
+seurat_object <- readRDS("data.rds")
+
+seurat_object1 <- Seurat::SCTransform(seurat_object, 
+                                      new.assay.name = "SCT", 
+                                      variable.features.n = 10000)
+
+E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
+                                    assay = "SCT",
+                                    slot = "scale.data"))
+
+nrow(E) # ! make sure this value is equal to 10000
+
 E[1:3, 1:3]
 ```
 
 Genes in your dataset may be named as Symbol, Entrez, Ensembl or RefSeq IDs. One of these names should be specified as value of `gene.id.type` parameter in `prepareData()`. 
 
+If you analyse singe cell or spatial RNA-seq data, please set `use.PCA=TRUE` in `prepareData()`.
+
 ```{r}
 E.prep <- prepareData(E = E,
                       gene.id.type = "Symbol",
-                      use.PCA = FALSE,
+                      use.PCA = TRUE,
                       use.PCA.n = 50,
                       network.annotation = network.annotation)
 
@@ -164,7 +176,7 @@ Note, that it may take a long time to derive metabolic modules by `gamClustering
 
 There is a set of parameters which determine the size and number of your final modules. We recommend you to start with the default settings, however you can adjust them based on your own preferences:
 
-1. If you consider final modules to be too small or too big and it complicates interpretation for you, you can either increase or reduce by 10 units the `max.module.size` parameter. 
+1. If you consider final modules to bee too small or too big and it complicates interpretation for you, you can either increase or reduce by 10 units the `max.module.size` parameter. 
 
 2. If among final modules you consider presence of any modules with too similar patterns, you can reduce by 0.1 units the `cor.threshold` parameter. 
 
@@ -232,44 +244,54 @@ head(read.tsv(paste0(work.dir, "/m.1.genes.tsv")))
 
 ##### Get plots of patterns and individual genes expression:
 
-```{r}
-patterns <- results$patterns.pos
+```{r, eval=FALSE}
+library(Seurat)
+library(fgsea)
 
-for (i in seq_along(m.gene.list)) {
-
-  heatmap <- E[m.gene.list[[i]], , drop=F]
-
-  pheatmap::pheatmap(
-    normalize.rows(heatmap),
-    cluster_rows=F, cluster_cols=F,
-    file=sprintf("%s/m.%s.genes.png", work.dir, i),
-    width=10, height=5,
-    show_rownames=T, show_colnames=T)
-}
+Seurat::DefaultAssay(seurat_object) <- "SCT"
+      
+for(i in seq_along(m.gene.list)){
+  
+  # print individuals:
+  
+  Seurat::FeaturePlot(seurat_object, 
+                      slot = "data",
+                      reduction = "umap",
+                      features = m.gene.list[[i]],
+                      ncol = 5,
+                      combine = T)
+  
+  ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
+                  width = 15, 
+                  height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
+  
+  # print pattern:
+  
+  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = "umap")
+  
+  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
+                  width = 4.5, 
+                  height = 4)
+  } 
 ```
 
 Example of the heatmap of the first module:
 
 ```{r, fig.width=20, fig.height=7}
-pheatmap::pheatmap(
-  normalize.rows(E[m.gene.list[[1]], , drop=F]),
-  show_rownames=T, show_colnames=T)
+
 ```
 
 Heatmap for patterns of all modules:
 
 ```{r, fig.width=20, fig.height=7}
-pheatmap::pheatmap(
-  normalize.rows(patterns),
-  cluster_rows=F, cluster_cols=F,
-  show_rownames=T, show_colnames=T)
+
 ```
 
-##### Get annotation tables and annotation heatmap for all modules:
+##### Get tables and plots with annotation of modules:
 
 Functional annotation of obtained modules is done based on KEGG and Reactome canonical metabolic pathways.
 
-```{r}
+```{r, eval = FALSE}
 getAnnotationTables(network.annotation = network.annotation,
                     nets = results$nets,
                     work.dir = work.dir)
@@ -291,7 +313,7 @@ getAnnotationHeatmap(work.dir = work.dir)
 
 You may also compare two results of running GAM-clustering on the same dataset (e.g. runs with different parameters) or compare two results of running GAM-clustering on different datasets (then set `same.data=FALSE`).
 
-```{r, eval = FALSE}
+```{r, eval=FALSE, eval = FALSE}
 modulesSimilarity(dir1 = work.dir,
                   dir2 = "old_dir",
                   name1 = "new",
