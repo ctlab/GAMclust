@@ -245,7 +245,7 @@ getAnnotationHeatmap <- function(work.dir,
     # width=ifelse(ncol(set_df) < 10, 7, ncol(set_df) * 0.35),
     # height=ifelse(max_len < 90, 8, ceiling(max_len/11)),
     cellwidth=30,
-    file=file.path(work.dir, file_name),
+    # file=file.path(work.dir, file_name),
     breaks = seq(0, 1, 0.05),
     color = colors4heatmap)
 

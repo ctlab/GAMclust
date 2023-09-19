@@ -291,9 +291,9 @@ gamClustering <- function(E.prep,
       
       # 2. SOLVE SGMWCS TO GET MODULES
       
-      cat("Calling: batch.solver(nets)\n")
+      # cat("Calling: batch.solver(nets)\n")
       ms <- batch.solver(nets_attr)
-      cat("Done: batch.solver(nets)\n")
+      # cat("Done: batch.solver(nets)\n")
       ms_mods <- lapply(ms, `[[`, "graph")
       
       # 2.a. COLLECT CORRESPONDING LOGS

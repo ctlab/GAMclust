@@ -1,0 +1,304 @@
+---
+title: 'GAM-clustering Tutorial Notebook For Reanalysis Of [ImmGen Open Source](http://artyomovlab.wustl.edu/immgen-met/) Bulk RNA-Seq Data'
+date: 2023/09/19
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "#", 
+  echo = TRUE,
+  warning = FALSE,
+  message = TRUE
+)
+```
+
+Required packages to be installed:
+
+```{r, eval=FALSE}
+if (!require("devtools", quietly = TRUE))
+    install.packages("BiocManager")
+
+devtools::install_github("ctlab/mwcsr")
+devtools::install_github("ctlab/fgsea")
+devtools::install_github("ctlab/gatom")
+```
+
+```{r, message=FALSE}
+library(mwcsr)
+library(fgsea)
+library(gatom)
+library(data.table)
+devtools::load_all(getwd())
+
+set.seed(42)
+```
+
+### Preparing working environment
+
+First, please load and initialize all objects required for GAM-clustering analysis:
+
+(1) load [KEGG](https://www.genome.jp/kegg/) metabolic network [`network.kegg.rds`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.kegg.rds) and its metabolites annotation [`met.kegg.db.rds`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.kegg.db.rds);
+
+```{r}
+network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.kegg.rds"))
+metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.kegg.db.rds"))
+```
+
+(2) load species-specific network annotation: [`org.Hs.eg.gatom.anno`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds) for human data or [`org.Mm.eg.gatom.anno`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds) for mouse data;
+
+```{r}
+network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds"))
+```
+
+(3) load provided list of metabolites that should not be considered during the analysis as connections between reactions (e.g., CO2, HCO3-, etc);
+
+```{r}
+met.to.filter <- data.table::fread(system.file("mets2mask.lst", package="GAMclust"))$ID
+```
+
+(4) initialize SMGWCS solver: 
+
+(4.1.) we recommend to use here either heuristic relax-and-cut solver `rnc_solver` from [`mwcsr`](https://github.com/ctlab/mwcsr) package, 
+
+```{r}
+solver <- mwcsr::rnc_solver()
+```
+
+(4.2.) either proprietary [CPLEX solver](https://www.ibm.com/products/ilog-cplex-optimization-studio) (free for academy);
+
+```{r}
+cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
+solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
+```
+
+(5) set working directory where the results will be saved to.
+
+```{r}
+work.dir <- "results"
+dir.create(work.dir, showWarnings = F, recursive = T)
+```
+
+(6) TEMPORARY: collecting logs while developing the tool.
+
+```{r}
+stats.dir <- paste0(work.dir, "/stats")
+dir.create(stats.dir, showWarnings = F, recursive = T)
+
+log_file <- file(paste0(stats.dir, "/log.txt"), open = "wt")
+sink(log_file, type = "output", append = TRUE)
+sink(log_file, type = "message", append = TRUE)
+```
+
+### Preparing objects for the analysis
+
+#### Preparing data
+
+GAMclust works with bulk, single cell and spatial RNA-seq data.
+
+This vignette shows how to process bulk RNA-seq data on the example of [ImmGen Open Source](http://artyomovlab.wustl.edu/immgen-met/) data reanalysis.
+
+Let's load the data.
+
+```{r}
+expression_set_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/243_es.top12k.rds"))
+E <- Biobase::exprs(expression_set_object)
+E[1:3, 1:3]
+```
+
+Genes in your dataset may be named as Symbol, Entrez, Ensembl or RefSeq IDs. One of these names should be specified as value of `gene.id.type` parameter in `prepareData()`. 
+
+```{r}
+E.prep <- prepareData(E = E,
+                      gene.id.type = "Symbol",
+                      use.PCA = FALSE,
+                      use.PCA.n = 50,
+                      network.annotation = network.annotation)
+
+E.prep[1:3, 1:3]
+```
+
+#### Preparing network
+
+The `prepareNetwork()` function defines the structure of the final metabolic modules. 
+
+```{r}
+network.prep <- prepareNetwork(E = E.prep,
+                               network = network,
+                               met.to.filter = met.to.filter,
+                               network.annotation = network.annotation)
+```
+
+#### Preclustering
+
+The `preClustering()` function defines initial patterns using k-medoids clustering on gene expression matrix. It is strongly recommended to do initial clustering with no less than 32 clusters (`initial.number.of.clusters = 32`).
+
+You can visualize the initial heatmap as shown below.
+
+```{r, fig.width=20, fig.height=7}
+cur.centers <- preClustering(E.prep = E.prep,
+                             network.prep = network.prep,
+                             initial.number.of.clusters = 32,
+                             network.annotation = network.annotation)
+
+cur.centers[1:3, 1:3]
+
+pheatmap::pheatmap(
+      normalize.rows(cur.centers),
+      cluster_rows=F, cluster_cols=F,
+      show_rownames=F, show_colnames=T)
+```
+
+### GAM-clustering analysis
+
+Now you have everything prepared for the GAM-clustering analysis.
+
+Initial patterns will be now refined in an iterative process. The output of `gamClustering()` function presents a set of specific subnetworks (also called metabolic modules) that reflect metabolic variability within a given transcriptional dataset.
+
+Note, that it may take a long time to derive metabolic modules by `gamClustering()` function (tens of minutes).
+
+There is a set of parameters which determine the size and number of your final modules. We recommend you to start with the default settings, however you can adjust them based on your own preferences:
+
+1. If you consider final modules to be too small or too big and it complicates interpretation for you, you can either increase or reduce by 10 units the `max.module.size` parameter. 
+
+2. If among final modules you consider presence of any modules with too similar patterns, you can reduce by 0.1 units the `cor.threshold` parameter. 
+
+3. If among final modules you consider presence of any uninformative modules, you can reduce by 10 times the `p.adj.val.threshold` parameter. 
+
+```{r, message=FALSE, error=FALSE}
+results <- gamClustering(E.prep = E.prep,
+                         network.prep = network.prep,
+                         cur.centers = cur.centers,
+                         
+                         start.base = 0.5,
+                         base.dec = 0.05,
+                         max.module.size = 50,
+
+                         cor.threshold = 0.8,
+                         p.adj.val.threshold = 1e-5,
+
+                         batch.solver = seq_batch_solver(solver),
+                         work.dir = work.dir,
+                         
+                         show.intermediate.clustering = FALSE,
+                         verbose = FALSE,
+                         collect.stats = TRUE)
+```
+
+### Visualizing and exploring the GAM-clustering results
+
+Each metabolic module is a connected piece of metabolic network whose genes expression is correlated across all dataset.
+
+The following functions will help you to visualize and explore the obtained results.
+
+##### Get graphs of modules:
+
+```{r}
+getGraphs(modules = results$modules,
+          network.annotation = network.annotation,
+          metabolites.annotation = metabolites.annotation,
+          seed.for.layout = 42,
+          work.dir = work.dir)
+```
+
+Example of the graph of the first module:
+
+<img src="/home/octopus/R-studio/GAMclust/vignette/results/m.1.svg" type="image/svg+xml" />
+
+
+##### Get gene tables:
+
+The table contains gene list. Each gene has two descriptive values: i) gene's correlation value with the modules pattren and ii) gene's score.
+High score means that this gene's expression is similar to the module's pattern and not similar to other modules' patterns.
+
+```{r}
+m.gene.list <- getGeneTables(modules = results$modules,
+                             nets = results$nets,
+                             patterns = results$patterns.pos,
+                             gene.exprs = E.prep,
+                             network.annotation = network.annotation,
+                             work.dir = work.dir)
+```
+
+Example of the gene table of the first module:
+
+```{r}
+head(read.tsv(paste0(work.dir, "/m.1.genes.tsv")))
+```
+
+##### Get plots of patterns and individual genes expression:
+
+```{r}
+patterns <- results$patterns.pos
+
+for (i in seq_along(m.gene.list)) {
+
+  heatmap <- E[m.gene.list[[i]], , drop=F]
+
+  pheatmap::pheatmap(
+    normalize.rows(heatmap),
+    cluster_rows=F, cluster_cols=F,
+    file=sprintf("%s/m.%s.genes.png", work.dir, i),
+    width=10, height=5,
+    show_rownames=T, show_colnames=T)
+}
+```
+
+Example of the heatmap of the first module:
+
+```{r, fig.width=20, fig.height=7}
+pheatmap::pheatmap(
+  normalize.rows(E[m.gene.list[[1]], , drop=F]),
+  show_rownames=T, show_colnames=T)
+```
+
+Heatmap for patterns of all modules:
+
+```{r, fig.width=20, fig.height=7}
+pheatmap::pheatmap(
+  normalize.rows(patterns),
+  cluster_rows=F, cluster_cols=F,
+  show_rownames=T, show_colnames=T)
+```
+
+##### Get annotation tables and annotation heatmap for all modules:
+
+Functional annotation of obtained modules is done based on KEGG and Reactome canonical metabolic pathways.
+
+```{r}
+getAnnotationTables(network.annotation = network.annotation,
+                    nets = results$nets,
+                    work.dir = work.dir)
+```
+
+Example of the annotation table of the first module:
+
+```{r}
+head(read.tsv(paste0(work.dir, "/m.1.pathways.tsv")))
+```
+
+Annotation heatmap for all modules:
+
+```{r, fig.width=20, fig.height=13}
+getAnnotationHeatmap(work.dir = work.dir)
+```
+
+##### Compare modules obtained in different runs:
+
+You may also compare two results of running GAM-clustering on the same dataset (e.g. runs with different parameters) or compare two results of running GAM-clustering on different datasets (then set `same.data=FALSE`).
+
+```{r, eval = FALSE}
+modulesSimilarity(dir1 = work.dir,
+                  dir2 = "old_dir",
+                  name1 = "new",
+                  name2 = "old",
+                  same.data = TRUE,
+                  use.genes.with.pos.score = TRUE,
+                  work.dir = work.dir,
+                  file.name = "comparison.png")
+```
