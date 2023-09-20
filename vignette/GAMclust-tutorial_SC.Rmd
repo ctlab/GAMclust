@@ -11,7 +11,7 @@ editor_options:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
-  comment = "#", 
+  comment = "#",
   echo = TRUE,
   warning = FALSE,
   message = TRUE
@@ -24,17 +24,18 @@ Required packages to be installed:
 if (!require("devtools", quietly = TRUE))
     install.packages("BiocManager")
 
+devtools::install_github("ctlab/GAMclust")
+devtools::install_github("ctlab/gatom")
 devtools::install_github("ctlab/mwcsr")
 devtools::install_github("ctlab/fgsea")
-devtools::install_github("ctlab/gatom")
 ```
 
 ```{r, message=FALSE}
+library(GAMclust)
+library(gatom)
 library(mwcsr)
 library(fgsea)
-library(gatom)
 library(data.table)
-devtools::load_all(getwd())
 
 set.seed(42)
 ```
@@ -103,14 +104,15 @@ GAMclust works with bulk, single cell and spatial RNA-seq data.
 
 This vignette shows how to process single cell RNA-seq data on the example of [Tabula Muris Senis](http://artyomovlab.wustl.edu/immgen-met/) data reanalysis.
 
-Let's load the data. (If you analyse multi-sample data, after per-sample `SCTransform()` application do not forget to set `nfeatures=10000` in `SelectIntegrationFeatures()`).
+For single cell data, take 10,000 genes for GAM-clustering analysis. 
+To do this while [preprocessing data with Seurat pipeline](https://satijalab.org/seurat/articles/sctransform_vignette), set `variable.features.n = 10000` in `SCTransform()` function.
+In case of [preprocessing multi-sample data](https://satijalab.org/seurat/articles/integration_introduction), set `nfeatures=10000` in `SelectIntegrationFeatures()`).
+
+Let's load already preprocessed data. 
 
 ```{r}
-seurat_object <- readRDS("data.rds")
-
-seurat_object1 <- Seurat::SCTransform(seurat_object, 
-                                      new.assay.name = "SCT", 
-                                      variable.features.n = 10000)
+options(timeout=7000)
+seurat_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/tms12k.rds"))
 
 E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
                                     assay = "SCT",
@@ -220,7 +222,7 @@ getGraphs(modules = results$modules,
 
 Example of the graph of the first module:
 
-<img src="/home/octopus/R-studio/GAMclust/vignette/results/m.1.svg" type="image/svg+xml" />
+<img src="/nfs/home/againullina/GAMclust/vignette/results/m.1.svg" type="image/svg+xml" />
 
 ##### Get gene tables:
 
@@ -242,49 +244,38 @@ Example of the gene table of the first module:
 head(read.tsv(paste0(work.dir, "/m.1.genes.tsv")))
 ```
 
-##### Get plots of patterns and individual genes expression:
+##### Get plots of patterns:
 
-```{r, eval=FALSE}
-library(Seurat)
-library(fgsea)
-
-Seurat::DefaultAssay(seurat_object) <- "SCT"
-      
-for(i in seq_along(m.gene.list)){
+```{r, fig.width=20, fig.height=20}
+for(i in 1:length(m.gene.list)){
   
-  # print individuals:
-  
-  Seurat::FeaturePlot(seurat_object, 
-                      slot = "data",
-                      reduction = "umap",
-                      features = m.gene.list[[i]],
-                      ncol = 5,
-                      combine = T)
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
-                  width = 15, 
-                  height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
-  
-  # print pattern:
-  
-  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], seurat_object, reduction = "umap")
+  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], 
+                                          seurat_object, 
+                                          reduction = "umap")
   
   ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
                   width = 4.5, 
                   height = 4)
-  } 
+}
 ```
 
-Example of the heatmap of the first module:
+##### Get plots of individual genes expression (example for 1st module):
 
-```{r, fig.width=20, fig.height=7}
+```{r, fig.width=20, fig.height=20}
+Seurat::DefaultAssay(seurat_object) <- "SCT"
 
-```
+i <- 1
 
-Heatmap for patterns of all modules:
+Seurat::FeaturePlot(seurat_object, 
+                    slot = "data",
+                    reduction = "umap",
+                    features = m.gene.list[[i]],
+                    ncol = 5,
+                    combine = T)
 
-```{r, fig.width=20, fig.height=7}
-
+ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
+                width = 15, 
+                height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
 ```
 
 ##### Get tables and plots with annotation of modules:

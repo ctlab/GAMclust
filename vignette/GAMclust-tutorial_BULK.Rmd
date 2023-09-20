@@ -11,7 +11,7 @@ editor_options:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
-  comment = "#", 
+  comment = "#",
   echo = TRUE,
   warning = FALSE,
   message = TRUE
@@ -24,17 +24,18 @@ Required packages to be installed:
 if (!require("devtools", quietly = TRUE))
     install.packages("BiocManager")
 
+devtools::install_github("ctlab/GAMclust")
+devtools::install_github("ctlab/gatom")
 devtools::install_github("ctlab/mwcsr")
 devtools::install_github("ctlab/fgsea")
-devtools::install_github("ctlab/gatom")
 ```
 
 ```{r, message=FALSE}
+library(GAMclust)
+library(gatom)
 library(mwcsr)
 library(fgsea)
-library(gatom)
 library(data.table)
-devtools::load_all(getwd())
 
 set.seed(42)
 ```

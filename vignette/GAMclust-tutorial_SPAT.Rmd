@@ -11,7 +11,7 @@ editor_options:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
-  comment = "#", 
+  comment = "#",
   echo = TRUE,
   warning = FALSE,
   message = TRUE
@@ -24,17 +24,18 @@ Required packages to be installed:
 if (!require("devtools", quietly = TRUE))
     install.packages("BiocManager")
 
+devtools::install_github("ctlab/GAMclust")
+devtools::install_github("ctlab/gatom")
 devtools::install_github("ctlab/mwcsr")
 devtools::install_github("ctlab/fgsea")
-devtools::install_github("ctlab/gatom")
 ```
 
 ```{r, message=FALSE}
+library(GAMclust)
+library(gatom)
 library(mwcsr)
 library(fgsea)
-library(gatom)
 library(data.table)
-devtools::load_all(getwd())
 
 set.seed(42)
 ```
@@ -101,15 +102,17 @@ sink(log_file, type = "message", append = TRUE)
 
 GAMclust works with bulk, single cell and spatial RNA-seq data.
 
-This vignette shows how to process spatial RNA-seq data.
+This vignette shows how to process spatial RNA-seq data. 
 
-Let's load the data.
+Let's load the data and take 10,000 genes for GAM-clustering analysis.
 
 ```{r}
 seurat_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/275_T_seurat.rds"))
 
 genes.avrg <- Matrix::rowMeans(seurat_object@assays$Spatial@data)
+
 genes.top10k <- names(head(sort(genes.avrg, decreasing = TRUE), 10000))
+
 seurat_object <- Seurat::SCTransform(seurat_object, 
                                      assay = "Spatial", 
                                      residual.features = genes.top10k, 
@@ -239,43 +242,34 @@ m.gene.list <- getGeneTables(modules = results$modules,
                              work.dir = work.dir)
 ```
 
-##### Get plots of patterns and individual genes expression:
+##### Get plots of patterns:
 
-```{r, eval=FALSE}
-library(Seurat)
-library(fgsea)
-
+```{r, fig.width=20, fig.height=20}
 for(i in 1:length(m.gene.list)){
   
-  # print individuals:
+  fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], 
+                                        seurat_object)
   
-  Seurat::SpatialFeaturePlot(seurat_object, 
-                             features = m.gene.list[[i]],
-                             ncol = 8)
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i),
-                  width = 18,
-                  height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
-  
-  # print pattern:
-
-  fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], seurat_object)
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i),
-                  width = 4.5,
+  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
+                  width = 4.5, 
                   height = 4)
 }
 ```
-Example of the heatmap of the first module:
 
-```{r, fig.width=20, fig.height=7}
+##### Get plots of individual genes expression (example for 1st module):
 
-```
+```{r, fig.width=20, fig.height=20}
+Seurat::DefaultAssay(seurat_object) <- "SCT"
 
-Heatmap for patterns of all modules:
+i <- 1
 
-```{r, fig.width=20, fig.height=7}
+Seurat::SpatialFeaturePlot(seurat_object, 
+                           features = m.gene.list[[i]],
+                           ncol = 8)
 
+ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
+                width = 18, 
+                height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
 ```
 
 ##### Get tables and plots with annotation of modules:
