@@ -12,6 +12,9 @@ Authors@R:
            role = "aut",
            email = "alsergbox@gmail.com",
            comment = c(ORCID = "0000-0003-1159-7220"))
+Author: Anastasiia Gainullina [aut, cre],
+        Alexey Sergushichev [aut],
+Maintainer: Anastasiia Gainullina <anastasiia.gainullina@gmail.com>
 Description: The GAM-clustering method reveals metabolic variability within dataset using a novel 
     network-based computational approach. This method utilizes cellular transcriptional profiles as 
     proxies. The metabolic network of reactions is presented as a graph. This graph has vertices 
@@ -34,9 +37,7 @@ Imports:
     limma,
     mwcsr,
     irlba,
-    pheatmap,
-    Rgraphviz,
-    rsvg
+    pheatmap
 Suggests:
     AnnotationDbi,
     org.Mm.eg.db,
@@ -44,7 +45,9 @@ Suggests:
     KEGGREST,
     Seurat,
     Rgraphviz,
-    rsvg
+    rsvg,
+    testthat,
+    knitr
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
