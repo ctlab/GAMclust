@@ -1,80 +1,57 @@
-data("metObjs")
-data("metObjs_atoms")
+options(bitmapType = "cairo")
+options(timeout = 600)
+data("GAMresults_ex")
+data("GAMresults_atoms_ex")
+data("bulkRNAdata_ex_good_prep")
 
-network.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds"))
+network.annotation.mm <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds"))
+
 
 test_that("modulesSimilarity works", {
-
-  cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
-  solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
+  
+  work.dir <- file.path(tempdir(), "testGAMclustering")
+  dir.create(work.dir)
 
   # clustering 1
-  work.dir1 <- file.path(tempdir(), "testSimilarity1")
+  work.dir1 <- file.path(tempdir(), "testGAMclustering1")
   dir.create(work.dir1)
-  repeats <- colnames(metObjs$exprsMetab)
-
-  exprsMetab.centers <- preClustering(gene.exprs = metObjs$exprsMetab,
-                                      repeats = repeats,
-                                      initial.number.of.clusters = 8,
-                                      show.initial.clustering = TRUE)
-
-  results <- gamClustering(gene.exprs = metObjs$exprsMetab,
-                           repeats = repeats,
-                           cur.centers = exprsMetab.centers,
-                           edge.table = metObjs$globalEdgeTable,
-                           batch.solver = seq_batch_solver(solver),
-                           show.intermediate.clustering = TRUE,
-                           verbose = TRUE,
-                           collect.stats = TRUE,
-                           work.dir = work.dir1)
-
   getGeneTables(modules = results$modules,
                 nets = results$nets,
                 patterns = results$patterns.pos,
-                gene.exprs = metObjs$exprsMetab,
-                network.annotation = network.annotation,
+                gene.exprs = E.prep,
+                network.annotation = network.annotation.mm,
                 work.dir = work.dir1)
+  dir.create(sprintf("%s/stats", work.dir1), showWarnings=FALSE, recursive=TRUE)
+  write.tsv(results$patterns.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir1))
+  write.tsv(results$patterns.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir1))
 
-  # clustering 1
-  work.dir2 <- file.path(tempdir(), "testSimilarity2")
+  # clustering 2
+  work.dir2 <- file.path(tempdir(), "testGAMclustering2")
   dir.create(work.dir2)
-  repeats <- colnames(metObjs.atoms$exprsMetab)
-
-  exprsMetab.centers <- preClustering(gene.exprs = metObjs.atoms$exprsMetab,
-                                      repeats = repeats,
-                                      initial.number.of.clusters = 8,
-                                      show.initial.clustering = TRUE)
-
-  results <- gamClustering(gene.exprs = metObjs.atoms$exprsMetab,
-                           repeats = repeats,
-                           cur.centers = exprsMetab.centers,
-                           edge.table = metObjs.atoms$globalEdgeTable,
-                           batch.solver = seq_batch_solver(solver),
-                           show.intermediate.clustering = TRUE,
-                           verbose = TRUE,
-                           collect.stats = TRUE,
-                           work.dir = work.dir2)
-
-  getGeneTables(modules = results$modules,
-                nets = results$nets,
-                patterns = results$patterns.pos,
-                gene.exprs = metObjs.atoms$exprsMetab,
-                network.annotation = network.annotation,
+  getGeneTables(modules = results.atom$modules,
+                nets = results.atom$nets,
+                patterns = results.atom$patterns.pos,
+                gene.exprs = E.prep,
+                network.annotation = network.annotation.mm,
                 work.dir = work.dir2)
+  dir.create(sprintf("%s/stats", work.dir2), showWarnings=FALSE, recursive=TRUE)
+  write.tsv(results.atom$patterns.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir2))
+  write.tsv(results.atom$patterns.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir2))
 
 
   r <- evaluate_promise(modulesSimilarity(dir1 = work.dir1,
                                           dir2 = work.dir2,
-                                          name1 = "analysisOfDataset1",
-                                          name2 = "analysisOfDataset1_changedParameters",
+                                          name1 = "new",
+                                          name2 = "old",
                                           same.data = TRUE,
                                           use.genes.with.pos.score = TRUE,
-                                          work.dir = work.dir1,
-                                          file.name = "compareTo_changedParameters.png"))
+                                          work.dir = work.dir,
+                                          file.name = "comparison.png"))
 
-  expect_true(r$result == file.path(work.dir1, "compareTo_changedParameters.png"))
+  expect_true(r$result == file.path(work.dir, "comparison.png"))
   expect_true(length(r$warnings) == 0)
-
+  
+  unlink(work.dir, recursive = T)
   unlink(work.dir1, recursive = T)
   unlink(work.dir2, recursive = T)
 
