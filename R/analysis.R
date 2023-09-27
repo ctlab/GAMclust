@@ -27,15 +27,17 @@ prepareData <- function(
   
   if(is.null(gene.id.type) || gene.id.type == network.annotation$baseId){
     message("No gene annotation was performed")
-  }
-  if(gene.id.type %in% names(network.annotation$mapFrom)){
-    
-    rownames.dubl <- network.annotation$mapFrom[[gene.id.type]][rownames(E)]
-    rownames(E) <- rownames.dubl[!duplicated(rownames.dubl[[gene.id.type]]), ]$gene
-
   } else {
-    stop(sprintf("Please provide `gene.id.type` as one of the following: %s", 
-                 paste(names(network.annotation$mapFrom), collapse = ", ")))
+    
+    if(gene.id.type %in% names(network.annotation$mapFrom)){
+      
+      rownames.dubl <- network.annotation$mapFrom[[gene.id.type]][rownames(E)]
+      rownames(E) <- rownames.dubl[!duplicated(rownames.dubl[[gene.id.type]]), ]$gene
+      
+    } else {
+      stop(sprintf("Please provide `gene.id.type` as one of the following: %s", 
+                   paste(c(names(network.annotation$mapFrom), "Entrez"), collapse = ", ")))
+    }
   }
   
   names(new2old) <- rownames(E)

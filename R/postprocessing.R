@@ -195,11 +195,11 @@ getAnnotationHeatmap <- function(work.dir,
 
   set <- list()
 
-  options(readr.num_columns = 0)
+  # options(readr.num_columns = 0)
   for (i in 1:length(m_files)) {
     messagef("Processing module %s", as.numeric(gsub(".*m\\.(\\d+).*", "\\1", m_files[i])))
-    file <- readr::read_tsv(m_files[i], show_col_types = FALSE)
-    moduleSize <- nrow(readr::read_tsv(m_files_genes[i], show_col_types = FALSE))
+    file <- read.tsv(m_files[i])
+    moduleSize <- nrow(read.tsv(m_files_genes[i]))
     messagef(sprintf("Module size: %s", moduleSize))
     if (length(file$overlap) == 0) {
       paths <- file[, c("pathway", "overlap")]

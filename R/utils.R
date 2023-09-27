@@ -75,10 +75,10 @@ doGeseca <- function(E.prep,
     lapply(modules, function(cm) {igraph::E(cm)$gene}), 
     paste0("c.pos", seq_along(modules)))
   
-  suppressWarnings(gesecaRes <- geseca(pathways = modules_path,
-                                       E = E.prep_filtered, 
-                                       scale = scale,
-                                       center = center))
+  suppressWarnings(gesecaRes <- fgsea::geseca(pathways = modules_path,
+                                              E = E.prep_filtered,
+                                              scale = scale,
+                                              center = center))
   
   if(verbose){
     messagef(">> geseca padjs were in range: %s", paste(round(range(gesecaRes$padj), 5), collapse = "-"))}
@@ -216,6 +216,8 @@ compareModules <- function(dir1, dir2,
     compare.df.norm[is.na(compare.df.norm)] <- 0  # 04.04.2022 Zhenya
   }
 
+  all.same <- length(unique(unlist(as.vector(compare.df.norm)))) == 1
+  if (all.same) {breaks <- c(0, 1)} else {breaks <- NA}
   # save heatmap
   pheatmap::pheatmap(
     compare.df.norm,  # 04.04.2022 Zhenya
@@ -228,6 +230,7 @@ compareModules <- function(dir1, dir2,
     fontsize_col = 18,
     fontsize_row = 18,
     width=8, height=5,
+    breaks = breaks,
     show_rownames=T, show_colnames=T,
     main = paste0('Intersection',
                   ifelse(use.genes.with.pos.score.only, ": pos.genes", "")))
@@ -269,6 +272,8 @@ compareModulesCor <- function(patterns.dir1, patterns.dir2,
     colnames(compare.df)[
       order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", colnames(compare.df))))]]
 
+  all.same <- length(unique(unlist(as.vector(compare.df)))) == 1
+  if (all.same) {breaks <- c(0, 1)} else {breaks <- NA}
   # save heatmap
   pheatmap::pheatmap(
     compare.df,
@@ -280,6 +285,7 @@ compareModulesCor <- function(patterns.dir1, patterns.dir2,
     fontsize_col = 18,
     fontsize_row = 18,
     width=8, height=5,
+    breaks = breaks,
     show_rownames=T, show_colnames=T,
     main = paste0('Correlation of patterns',
                   ifelse(substr(patterns.dir1,
@@ -338,6 +344,8 @@ compareModulesIndex <- function(dir1, dir2,
     colnames(compare.df)[
       order(as.numeric(gsub(".*m\\.(\\d+).*", "\\1", colnames(compare.df))))]]
 
+  all.same <- length(unique(unlist(as.vector(compare.df)))) == 1
+  if (all.same) {breaks <- c(0, 1)} else {breaks <- NA}
   # save heatmap
   pheatmap::pheatmap(
     compare.df,
@@ -349,6 +357,7 @@ compareModulesIndex <- function(dir1, dir2,
     fontsize_col = 18,
     fontsize_row = 18,
     width=8, height=5,
+    breaks = breaks,
     show_rownames=T, show_colnames=T,
     # main = sprintf("Rows: %s / Columns: %s", rows.name, cols.name)
     main = paste0(
