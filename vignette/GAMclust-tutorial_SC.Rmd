@@ -1,6 +1,6 @@
 ---
 title: 'GAM-clustering Tutorial Notebook For Reanalysis Of [Metabolic Tabula Muris Senis](http://artyomovlab.wustl.edu/immgen-met/) Single Cell RNA-Seq Data'
-date: 2023/09/19
+date: 2023/09/29
 output:
   html_document:
     df_print: paged
@@ -36,6 +36,7 @@ library(gatom)
 library(mwcsr)
 library(fgsea)
 library(data.table)
+library(Seurat)
 
 set.seed(42)
 ```
@@ -74,7 +75,14 @@ solver <- mwcsr::rnc_solver()
 (4.2.) either proprietary [CPLEX solver](https://www.ibm.com/products/ilog-cplex-optimization-studio) (free for academy);
 
 ```{r}
-cplex.dir <- "/opt/ibm/ILOG/CPLEX_Studio1271"
+cplex.dir <-  "/opt/ibm/ILOG/CPLEX_Studio1271"
+```
+
+```{r, include=FALSE}
+cplex.dir <-  "/nfs/home/againullina/lib/sgmwcs/private-libraries/CPLEX_Studio1271"
+```
+
+```{r}
 solver <- mwcsr::virgo_solver(cplex_dir = cplex.dir)
 ```
 
@@ -104,21 +112,24 @@ GAMclust works with bulk, single cell and spatial RNA-seq data.
 
 This vignette shows how to process single cell RNA-seq data on the example of [Tabula Muris Senis](http://artyomovlab.wustl.edu/immgen-met/) data reanalysis.
 
-For single cell data, take 10,000 genes for GAM-clustering analysis. 
-To do this while [preprocessing data with Seurat pipeline](https://satijalab.org/seurat/articles/sctransform_vignette), set `variable.features.n = 10000` in `SCTransform()` function.
-In case of [preprocessing multi-sample data](https://satijalab.org/seurat/articles/integration_introduction), set `nfeatures=10000` in `SelectIntegrationFeatures()`).
+For single cell data, take 6,000-12,000 genes for GAM-clustering analysis. 
+To do this while [preprocessing data with Seurat pipeline](https://satijalab.org/seurat/articles/sctransform_vignette), set `variable.features.n = 12000` in `SCTransform()` function.
+In case of [preprocessing multi-sample data](https://satijalab.org/seurat/articles/integration_introduction), set `nfeatures=12000` in `SelectIntegrationFeatures()`).
 
-Let's load already preprocessed data. 
+Let's load already preprocessed data.
+
+```{r, include=FALSE}
+options(timeout=7000)
+```
 
 ```{r}
-options(timeout=7000)
 seurat_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/tms12k.rds"))
 
 E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
                                     assay = "SCT",
                                     slot = "scale.data"))
 
-nrow(E) # ! make sure this value is equal to 10000
+nrow(E) # ! make sure this value is in range from 6,000 to 12,000
 
 E[1:3, 1:3]
 ```
@@ -220,9 +231,9 @@ getGraphs(modules = results$modules,
           work.dir = work.dir)
 ```
 
-Example of the graph of the first module:
+Example of the graph of the third module:
 
-<img src="/nfs/home/againullina/GAMclust/vignette/results/m.1.svg" type="image/svg+xml" />
+<img src="/nfs/home/againullina/GAMclust/results/m.3.svg" type="image/svg+xml" />
 
 ##### Get gene tables:
 
@@ -238,65 +249,60 @@ m.gene.list <- getGeneTables(modules = results$modules,
                              work.dir = work.dir)
 ```
 
-Example of the gene table of the first module:
+Example of the gene table of the third module:
 
 ```{r}
-head(read.tsv(paste0(work.dir, "/m.1.genes.tsv")))
+head(read.tsv(paste0(work.dir, "/m.3.genes.tsv")))
 ```
 
 ##### Get plots of patterns:
 
-```{r, fig.width=20, fig.height=20}
+```{r, figures-side, fig.show="hold", out.width="50%"}
 for(i in 1:length(m.gene.list)){
   
-  fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], 
-                                          seurat_object, 
-                                          reduction = "umap")
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
-                  width = 4.5, 
-                  height = 4)
+  plot(fgsea::plotCoregulationProfileReduction(m.gene.list[[i]], 
+                                               seurat_object, 
+                                               title = paste0("module ", i),
+                                               raster = TRUE,
+                                               reduction = "pumap"))
 }
 ```
 
-##### Get plots of individual genes expression (example for 1st module):
+##### Get plots of individual genes expression (example for the 3d module):
 
-```{r, fig.width=20, fig.height=20}
+```{r, fig.width=20, fig.height=10}
 Seurat::DefaultAssay(seurat_object) <- "SCT"
 
-i <- 1
+i <- 3
 
 Seurat::FeaturePlot(seurat_object, 
                     slot = "data",
-                    reduction = "umap",
+                    reduction = "pumap",
                     features = m.gene.list[[i]],
-                    ncol = 5,
-                    combine = T)
-
-ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
-                width = 15, 
-                height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
+                    ncol = 6,
+                    raster = TRUE,
+                    combine = TRUE)
 ```
 
 ##### Get tables and plots with annotation of modules:
 
 Functional annotation of obtained modules is done based on KEGG and Reactome canonical metabolic pathways.
 
-```{r, eval = FALSE}
+```{r}
 getAnnotationTables(network.annotation = network.annotation,
                     nets = results$nets,
                     work.dir = work.dir)
 ```
 
-Example of the annotation table of the first module:
+Example of the annotation table of the third module:
 
 ```{r}
-head(read.tsv(paste0(work.dir, "/m.1.pathways.tsv")))
+head(read.tsv(paste0(work.dir, "/m.3.pathways.tsv")))
 ```
 
 Annotation heatmap for all modules:
 
-```{r, fig.width=20, fig.height=13}
+```{r, fig.width=20, fig.height=7}
 getAnnotationHeatmap(work.dir = work.dir)
 ```
 
@@ -306,7 +312,7 @@ You may also compare two results of running GAM-clustering on the same dataset (
 
 ```{r, eval=FALSE, eval = FALSE}
 modulesSimilarity(dir1 = work.dir,
-                  dir2 = "old_dir",
+                  dir2 = "old.dir",
                   name1 = "new",
                   name2 = "old",
                   same.data = TRUE,
