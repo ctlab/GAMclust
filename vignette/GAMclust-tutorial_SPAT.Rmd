@@ -1,6 +1,6 @@
 ---
 title: 'GAM-clustering Tutorial Notebook For Spatial RNA-Seq Data'
-date: 2023/09/19
+date: 2023/10/05
 output:
   html_document:
     df_print: paged
@@ -36,6 +36,7 @@ library(gatom)
 library(mwcsr)
 library(fgsea)
 library(data.table)
+library(Seurat)
 
 set.seed(42)
 ```
@@ -104,25 +105,21 @@ GAMclust works with bulk, single cell and spatial RNA-seq data.
 
 This vignette shows how to process spatial RNA-seq data. 
 
-Let's load the data and take 10,000 genes for GAM-clustering analysis.
+Let's load the data and take 10,000 genes for the GAM-clustering analysis.
 
-```{r}
+```{r, message=FALSE, error=FALSE}
 seurat_object <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GAMclust/275_T_seurat.rds"))
-
-genes.avrg <- Matrix::rowMeans(seurat_object@assays$Spatial@data)
-
-genes.top10k <- names(head(sort(genes.avrg, decreasing = TRUE), 10000))
 
 seurat_object <- Seurat::SCTransform(seurat_object, 
                                      assay = "Spatial", 
-                                     residual.features = genes.top10k, 
-                                     verbose = TRUE)
+                                     variable.features.n = 10000,
+                                     verbose = FALSE)
 
 E <- as.matrix(Seurat::GetAssayData(object = seurat_object,
                                     assay = "SCT",
                                     slot = "scale.data"))
 
-nrow(E) # ! make sure this value is equal to 10000
+nrow(E) # ! make sure this value is in range from 6,000 to 12,000
 
 E[1:3, 1:3]
 ```
@@ -167,7 +164,7 @@ cur.centers <- preClustering(E.prep = E.prep,
 cur.centers[1:3, 1:3]
 
 pheatmap::pheatmap(
-      normalize.rows(cur.centers),
+      GAMclust:::normalize.rows(cur.centers),
       cluster_rows=F, cluster_cols=F,
       show_rownames=F, show_colnames=T)
 ```
@@ -197,7 +194,7 @@ results <- gamClustering(E.prep = E.prep,
                          base.dec = 0.05,
                          max.module.size = 50,
 
-                         cor.threshold = 0.8,
+                         cor.threshold = 0.6,
                          p.adj.val.threshold = 1e-5,
 
                          batch.solver = seq_batch_solver(solver),
@@ -224,16 +221,16 @@ getGraphs(modules = results$modules,
           work.dir = work.dir)
 ```
 
-Example of the graph of the first module:
+Example of the graph of the fourth module:
 
-<img src="/home/octopus/R-studio/GAMclust/vignette/results/m.1.svg" type="image/svg+xml" />
+<img src="/home/octopus/R-studio/GAMclust/vignette/results/m.4.svg" type="image/svg+xml" />
 
 ##### Get gene tables:
 
 The table contains gene list. Each gene has two descriptive values: i) gene's correlation value with the modules pattern and ii) gene's score.
 High score means that this gene's expression is similar to the module's pattern and not similar to other modules' patterns.
 
-```{r, eval = FALSE}
+```{r}
 m.gene.list <- getGeneTables(modules = results$modules,
                              nets = results$nets,
                              patterns = results$patterns.pos,
@@ -242,55 +239,54 @@ m.gene.list <- getGeneTables(modules = results$modules,
                              work.dir = work.dir)
 ```
 
+Example of the gene table of the fourth module:
+
+```{r}
+head(GAMclust:::read.tsv(paste0(work.dir, "/m.4.genes.tsv")))
+```
+
 ##### Get plots of patterns:
 
-```{r, fig.width=20, fig.height=20}
+```{r, figures-side, fig.show="hold", out.width="50%"}
 for(i in 1:length(m.gene.list)){
   
-  fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], 
-                                        seurat_object)
-  
-  ggplot2::ggsave(file = sprintf("%s/m.%s.pattern.png", work.dir, i), 
-                  width = 4.5, 
-                  height = 4)
+  plot(fgsea::plotCoregulationProfileSpatial(m.gene.list[[i]], 
+                                             seurat_object,
+                                             title = paste0("module ", i)))
 }
 ```
 
-##### Get plots of individual genes expression (example for 1st module):
+##### Get plots of individual genes expression (example for fourth module):
 
 ```{r, fig.width=20, fig.height=20}
 Seurat::DefaultAssay(seurat_object) <- "SCT"
 
-i <- 1
+i <- 4
 
 Seurat::SpatialFeaturePlot(seurat_object, 
                            features = m.gene.list[[i]],
                            ncol = 8)
-
-ggplot2::ggsave(file = sprintf("%s/m.%s.genes.png", work.dir, i), 
-                width = 18, 
-                height = round(length(m.gene.list[[i]]) / 5)*2 + 1)
 ```
 
 ##### Get tables and plots with annotation of modules:
 
 Functional annotation of obtained modules is done based on KEGG and Reactome canonical metabolic pathways.
 
-```{r, eval = FALSE}
+```{r}
 getAnnotationTables(network.annotation = network.annotation,
                     nets = results$nets,
                     work.dir = work.dir)
 ```
 
-Example of the annotation table of the first module:
+Example of the annotation table of the fourth module:
 
 ```{r}
-head(read.tsv(paste0(work.dir, "/m.1.pathways.tsv")))
+head(GAMclust:::read.tsv(paste0(work.dir, "/m.4.pathways.tsv")))
 ```
 
 Annotation heatmap for all modules:
 
-```{r, fig.width=20, fig.height=13}
+```{r, fig.width=10, fig.height=10}
 getAnnotationHeatmap(work.dir = work.dir)
 ```
 
