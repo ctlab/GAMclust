@@ -25,9 +25,9 @@ if (!require("devtools", quietly = TRUE))
     install.packages("BiocManager")
 
 devtools::install_github("ctlab/GAMclust")
-devtools::install_github("ctlab/gatom")
-devtools::install_github("ctlab/mwcsr")
-devtools::install_github("ctlab/fgsea")
+BiocManager::install("gatom")
+BiocManager::install("mwcsr")
+BiocManager::install("fgsea")
 ```
 
 ```{r, message=FALSE}
@@ -47,8 +47,14 @@ First, please load and initialize all objects required for GAM-clustering analys
 (1) load [KEGG](https://www.genome.jp/kegg/) metabolic network [`network.kegg.rds`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.kegg.rds) and its metabolites annotation [`met.kegg.db.rds`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.kegg.db.rds);
 
 ```{r}
+# KEGG network:
 network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.kegg.rds"))
 metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.kegg.db.rds"))
+
+# combined network (KEGG+Rhea+transport reactions:
+network <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/network.combined.rds"))
+metabolites.annotation <- readRDS(url("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/met.combined.db.rds"))
+gene2reaction.extra <- data.table::fread("http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/gene2reaction.combined.mmu.eg.tsv", colClasses="character")
 ```
 
 (2) load species-specific network annotation: [`org.Hs.eg.gatom.anno`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Hs.eg.gatom.anno.rds) for human data or [`org.Mm.eg.gatom.anno`](http://artyomovlab.wustl.edu/publications/supp_materials/GATOM/org.Mm.eg.gatom.anno.rds) for mouse data;
@@ -137,8 +143,10 @@ The `prepareNetwork()` function defines the structure of the final metabolic mod
 ```{r}
 network.prep <- prepareNetwork(E = E.prep,
                                network = network,
+                               topology = "metabolites",
                                met.to.filter = met.to.filter,
-                               network.annotation = network.annotation)
+                               network.annotation = network.annotation,
+                               gene2reaction.extra = gene2reaction.extra)
 ```
 
 #### Preclustering

@@ -75,6 +75,7 @@ prepareData <- function(
 #' @param topology Vertices can be represented either as `metabolites`, either as `atoms`.
 #' @param met.to.filter Metabolites that should not be used as connections in the module.
 #' @param network.annotation Metabolic network annotation.
+#' @param gene2reaction.extra For a combined network: supplementary file with genes that either come from proteome or are not linked to a specific enzyme.
 #' @return Edges of the final network.
 #' @import data.table
 #' @export
@@ -83,13 +84,21 @@ prepareNetwork <- function(
     network,
     topology = c("metabolites", "atoms"),
     met.to.filter = data.table::fread(system.file("mets2mask.lst", package="GAMclust"))$ID,
-    network.annotation){
+    network.annotation,
+    gene2reaction.extra = NULL){
   
   topology <- match.arg(topology)
 
   globalEdgeTable_pre <- as.data.frame(network$reaction2align)
   globalEdgeTable_pre <- merge(globalEdgeTable_pre, network$enzyme2reaction)
   globalEdgeTable_pre <- merge(globalEdgeTable_pre, network.annotation$gene2enzyme)
+  
+  if(!is.null(gene2reaction.extra)){
+    globalEdgeTable_pre.extra <- merge(gene2reaction.extra, network$reaction2align)
+    globalEdgeTable_pre.extra <- cbind(enzyme = "-.-.-.-", globalEdgeTable_pre.extra)
+    globalEdgeTable_pre <- rbind(globalEdgeTable_pre, 
+                                 globalEdgeTable_pre.extra) 
+    }
   colnames(globalEdgeTable_pre)[which(colnames(globalEdgeTable_pre) == "atom.x")] <- "from"
   colnames(globalEdgeTable_pre)[which(colnames(globalEdgeTable_pre) == "atom.y")] <- "to"
   globalEdgeTable_pre$from.m <- network$atoms$metabolite[match(globalEdgeTable_pre$from, network$atoms$atom)]

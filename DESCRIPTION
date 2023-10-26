@@ -7,6 +7,9 @@ Authors@R:
            role = c("aut", "cre"),
            email = "anastasiia.gainullina@gmail.com",
            comment = c(ORCID = "0000-0003-3796-2337"))
+    person(given = "Evgeniia",
+           family = "Chikina",
+           role = "ctb"
     person(given = "Alexey",
            family = "Sergushichev",
            role = "aut",
@@ -53,5 +56,5 @@ Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.2.3
 VignetteBuilder: knitr
-URL: https://github.com/.../GAMclust
-BugReports: https://github.com/.../GAMclust/issues
+URL: https://github.com/ctlab/GAMclust
+BugReports: https://github.com/ctlab/GAMclust/issues
