@@ -9,7 +9,7 @@ Authors@R:
            comment = c(ORCID = "0000-0003-3796-2337"))
     person(given = "Evgeniia",
            family = "Chikina",
-           role = "ctb"
+           role = "ctb")
     person(given = "Alexey",
            family = "Sergushichev",
            role = "aut",
