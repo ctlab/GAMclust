@@ -24,6 +24,7 @@ Description: The GAM-clustering method reveals metabolic variability within data
     corresponding to metabolites and the edges corresponding to the reactions with the expressed genes. 
     In the graph the method tries to find a set of connected subgraphs. Genes of each connected subgraph 
     have highly correlated expression pattern.
+biocViews: GeneExpression, Pathways, Network
 Depends: 
     R (>= 3.5),
     data.table
