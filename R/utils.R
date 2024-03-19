@@ -149,6 +149,18 @@ read.tsv <- function(file, header=T, sep="\t", quote="", comment.char="", check.
   res
 }
 
+saveStats <- function(work.dir, rev, gesecaRes, iter.stats){
+  
+  dir.create(sprintf("%s/stats", work.dir), showWarnings=FALSE, recursive=TRUE)
+  
+  write.tsv(rev$centers.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir))
+  write.tsv(rev$centers.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir))
+  write.tsv(gesecaRes, file = sprintf("%s/stats/geseca_scores.tsv", work.dir))
+  
+  saveRDS(iter.stats, file = sprintf("%s/stats/iter.stats.rds", work.dir))
+  
+}
+
 # Get names with number of genes in modules
 getNamesWithLength <- function(dir, files, use.genes.with.pos.score.only=FALSE) {
 

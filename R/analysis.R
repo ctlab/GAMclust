@@ -275,7 +275,10 @@ gamClustering <- function(E.prep,
       # TODO: replace base to `correlation.threshold`
       nets <- lapply(idxs, function(i) {
 
-        minOther <- pmin(apply(dist.to.centers[-i, , drop=F], 2, min), base)
+        if(nrow(dist.to.centers) > 1) { 
+          minOther <- pmin(apply(dist.to.centers[-i, , drop=F], 2, min), base) } else { 
+            minOther <- base }
+        
         score <- log2(minOther) - log2(dist.to.centers[i, ])
         score[score == Inf] <- 0
         score <- pmax(score, -1000)
@@ -429,24 +432,22 @@ gamClustering <- function(E.prep,
       good <- gesecaRes$pathway[which(gesecaRes$padj < p.adj.val.threshold)]
       bad <- rownames(cur.centers)[!rownames(cur.centers) %in% good]
       
+      if (length(bad) == 0 & biggest.one > max.module.size) {next} 
       if (length(bad) == 0 & biggest.one <= max.module.size) {break} 
-      if (length(bad) != 0) {
+      if (length(bad) != 0 & nrow(cur.centers) > 1) {
         
-        centers.cors <- cor(t(cur.centers))
-        diag(centers.cors) <- 0
         max.cor.mod1 <- as.integer(gsub("c.pos", "", bad[which.max(apply(centers.cors, 1, max, na.rm=T)[bad])]))
         max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
         cur.centers <- updCenters(cur.centers = cur.centers, 
                                   m1 = max.cor.mod1, m2 = max.cor.mod2, 
                                   E.prep = E.prep, ms_mods = ms_mods)
+      } else {
+        saveStats(work.dir, rev, gesecaRes, iter.stats)
+        messagef("No modules found. Try to tune method's parameters (check '/stats' folder for the statistics of the run).")
+        return()
       }
     }
-    
-    if (nrow(cur.centers) == 1) {
-      messagef("ATTENTION: The reliability of the outputs falls short of our expectations. Need to tune the method's parameters to enhance the overall quality of the results.")
-      break
-      }
-    
+
     # keep expressions devoted to sizes of modules:
     # m.sizes <- sapply(modules, function(m) ulength(igraph::E(m)$gene))
     # modules <- modules[m.sizes >= min.module.size] # add as param
@@ -475,13 +476,7 @@ gamClustering <- function(E.prep,
   modules <- modules[as.numeric(gsub("c.pos", "", gesecaRes$pathway))]
   gesecaRes$pathway <- paste0("m", 1:nrow(gesecaRes)) 
 
-  # *
-  dir.create(sprintf("%s/stats", work.dir), showWarnings=FALSE, recursive=TRUE)
-  write.tsv(gesecaRes, file = sprintf("%s/stats/geseca_scores.tsv", work.dir))
-  write.tsv(rev$centers.pos, file = sprintf("%s/stats/patterns_pos.tsv", work.dir))
-  write.tsv(rev$centers.all, file = sprintf("%s/stats/patterns_all.tsv", work.dir))
-  saveRDS(iter.stats, file = sprintf("%s/stats/iter.stats.rds", work.dir))
-  # *
+  saveStats(work.dir, rev, gesecaRes, iter.stats)
 
   return(list(
     modules = modules,
