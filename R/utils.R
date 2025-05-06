@@ -81,7 +81,9 @@ doGeseca <- function(E.prep,
                                               center = center))
   
   if(verbose){
-    messagef(">> geseca padjs were in range: %s", paste(round(range(gesecaRes$padj), 5), collapse = "-"))}
+    flog.info(">> geseca padjs were in range: %s", 
+              paste(round(range(gesecaRes$padj), 5), collapse = "-"),
+              name = "stats.logger")}
   
   gesecaRes
 }
@@ -158,7 +160,6 @@ saveStats <- function(work.dir, rev, gesecaRes, iter.stats){
   write.tsv(gesecaRes, file = sprintf("%s/stats/geseca_scores.tsv", work.dir))
   
   saveRDS(iter.stats, file = sprintf("%s/stats/iter.stats.rds", work.dir))
-  
 }
 
 # Get names with number of genes in modules

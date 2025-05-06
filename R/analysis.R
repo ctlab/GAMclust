@@ -3,7 +3,7 @@
 #' @param E Expression matrix with rownames as gene symbols.
 #' @param gene.id.type Gene ID type.
 #' @param keep.top.genes Which top of the most expressed genes to keep for the further analysis.
-#' @param use.PCA Whether to reduce matrix dimentionality by PCA or not.
+#' @param use.PCA Whether to reduce matrix dimensionality by PCA or not.
 #' @param repeats Here you may collapse biological replicas by providing vector with repeated sample names
 #' @param network.annotation Metabolic network annotation.
 #' @return Expression matrix prepared for the analysis.
@@ -26,7 +26,7 @@ prepareData <- function(
   new2old <- rownames(E)
   
   if(is.null(gene.id.type) || gene.id.type == network.annotation$baseId){
-    message("No gene annotation was performed")
+    flog.info("No gene annotation was performed.", name = "stats.logger")
   } else {
     
     if(gene.id.type %in% names(network.annotation$mapFrom)){
@@ -35,8 +35,10 @@ prepareData <- function(
       rownames(E) <- rownames.dubl[!duplicated(rownames.dubl[[gene.id.type]]), ]$gene
       
     } else {
-      stop(sprintf("Please provide `gene.id.type` as one of the following: %s", 
-                   paste(c(names(network.annotation$mapFrom), "Entrez"), collapse = ", ")))
+      valid.types.string <- paste(c(names(network.annotation$mapFrom), "Entrez"), collapse = ", ")
+      message.string <- sprintf("Invalid `gene.id.type`: %s. Must be one of: %s.", gene.id.type, valid.types.string)
+      flog.error(message.string, name = "stats.logger")
+      stop(message.string)
     }
   }
   
@@ -52,7 +54,9 @@ prepareData <- function(
   
   if(use.PCA){
     if(use.PCA.n > ncol(E)){
-      stop(sprintf("Please provide value of `use.PCA.n` smaller than `ncol(E)` = %s", ncol(E)))
+      message.string <- sprintf("Please provide value of `use.PCA.n` smaller than `ncol(E)` = %s.", ncol(E))
+      flog.error(message.string, name = "stats.logger")
+      stop(message.string)
     }
     pcaRev <- irlba::prcomp_irlba(E, n = use.PCA.n, center = FALSE, scale. = FALSE, retx = TRUE)
     E.red <- pcaRev$x # E.red <- pcaRev$x %*% t(pcaRev$rotation)
@@ -112,7 +116,8 @@ prepareNetwork <- function(
     globalEdgeTable_pre <- globalEdgeTable_pre[, c("from", "to", "gene")]
     globalEdgeTable_pre <- globalEdgeTable_pre[!duplicated(globalEdgeTable_pre), ]
     
-    messagef("> Global atom network contains %s edges", dim(globalEdgeTable_pre)[1])
+    flog.info("Global atom network contains %s edges.", dim(globalEdgeTable_pre)[1], 
+              name = "stats.logger")
   }
   if(topology == "metabolites"){
     
@@ -121,14 +126,15 @@ prepareNetwork <- function(
     colnames(globalEdgeTable_pre)[which(colnames(globalEdgeTable_pre) == "from.m")] <- "from"
     colnames(globalEdgeTable_pre)[which(colnames(globalEdgeTable_pre) == "to.m")] <- "to"
     
-    messagef("> Global metabolite network contains %s edges.", dim(globalEdgeTable_pre)[1])
+    flog.info("Global metabolite network contains %s edges.", dim(globalEdgeTable_pre)[1], 
+              name = "stats.logger")
   }
-  
+
   if (dim(globalEdgeTable_pre)[1] == 0) {
-    stop(
-      "No metabolic genes from the analysed dataset mapped to the metabolic network.\n
-      In this case GAM-clustering will not work. Please try another subset of genes if it is possible.",
-      call. = F)
+    message.string <- "No metabolic genes from the analysed dataset mapped to the metabolic network.\n
+      In this case GAM-clustering will not work. Please try another subset of genes if it is possible."
+    flog.error(message.string, name = "stats.logger")
+    stop(message.string)
   }
   
   globalEdgeTable_pre_graph <- igraph::graph_from_data_frame(globalEdgeTable_pre, directed=FALSE)
@@ -136,9 +142,10 @@ prepareNetwork <- function(
   globalGraph <- globalEdgeTable_pre_graph_cc[[which.max(sapply(globalEdgeTable_pre_graph_cc, igraph::vcount))]]
   # multi-edges, loops
   
-  messagef("> Largest connected component of this global network contains %s nodes and %s edges.",
-           igraph::vcount(globalGraph), igraph::ecount(globalGraph))
-  
+  flog.info("Largest connected component of this global network contains %s nodes and %s edges.", 
+            igraph::vcount(globalGraph), igraph::ecount(globalGraph), 
+            name = "stats.logger")
+
   x.1p <- paste(globalEdgeTable_pre$from, globalEdgeTable_pre$to)
   x.2p <- with(igraph::as_data_frame(globalGraph), paste(c(from, to), c(to, from)))
   globalEdgeTable <- globalEdgeTable_pre[x.1p %in% x.2p, ]
@@ -162,8 +169,9 @@ preClustering <- function(E.prep,
                           ){
   
   E.prep <- E.prep[rownames(E.prep) %in% network.prep$gene, , drop = F]
-  messagef("> %d metabolic genes from the analysed dataset mapped to this component.",
-           dim(E.prep)[1])
+  flog.info("%d metabolic genes from the analysed dataset mapped to this component.",
+            dim(E.prep)[1],
+            name = "stats.logger")
 
   ### gene.cor <- cor(t(E.prep), use="pairwise.complete.obs")
   # gene.cor <- (E.prep %*% t(E.prep)) / max(rowSums(E.prep**2)) # max(rowSums(E.prep**2)) = x, while x+1 samples
@@ -178,7 +186,9 @@ preClustering <- function(E.prep,
     if(all(grepl("PC", colnames(E.prep)))) {
       ica_result <- fastICA::fastICA(t(E.prep), n.comp = initial.number.of.clusters) 
       cur.centers <- t(ica_result$S) } else {
-        stop("To perform ICA, set `use.PCA = TRUE` in `prepareData()` function")
+        message.string <- "To perform ICA, set `use.PCA = TRUE` in `prepareData()` function."
+        flog.error(message.string, name = "stats.logger")
+        stop(message.string)
       }
   }
   
@@ -197,7 +207,7 @@ preClustering <- function(E.prep,
 #' @param p.adj.val.threshold Padj threshold of geseca score for final modules.
 #' @param batch.solver Solver for SGMWCS problem.
 #' @param work.dir Working directory where results should be saved.
-#' @param show.intermediate.clustering Whether to show or not heatmap of intermideate clusters.
+#' @param show.intermediate.clustering Whether to show or not heatmap of intermediate clusters.
 #' @param verbose Verbose running.
 #' @param collect.stats Whether to save or not running statistics.
 #' @return results$modules -- Metabolic modules.
@@ -225,6 +235,8 @@ gamClustering <- function(E.prep,
                           collect.stats = TRUE
                           ){
   
+  flog.info("GAM-CLUSTERING starts here.", name = "stats.logger")
+  
   iteration <- 1
   base <- start.base
   iter.stats <- list()
@@ -236,8 +248,8 @@ gamClustering <- function(E.prep,
     
     while (T) {
       
-      messagef("[*] Iteration %s", iteration)
-
+      flog.info("[*] Iteration %s", iteration, name = "stats.logger")
+      
       # 0. PREPARE ENVIRONMENT
 
       gK1 <- nrow(cur.centers)
@@ -327,9 +339,13 @@ gamClustering <- function(E.prep,
         iter.stats[[iteration]] <- iter.stats_add
       }
       if (verbose) {
-        messagef(">> base was equal to: %s;", base)
-        messagef(">> number of modules was equal to: %s;", length(ms_mods))
-        messagef(">> sizes of modules (unique genes) were in range: %s-%s", min(m.size.unique), max(m.size.unique))
+        flog.info(">> base was equal to: %s", base, 
+                  name = "stats.logger")
+        flog.info(">> number of modules was equal to: %s", length(ms_mods), 
+                  name = "stats.logger")
+        flog.info(">> sizes of modules (unique genes) were in range: %s-%s", 
+                  min(m.size.unique), max(m.size.unique), 
+                  name = "stats.logger")
       }
 
       # 2.b. RECORD MODULES AND CENTERS
@@ -385,7 +401,7 @@ gamClustering <- function(E.prep,
       
       iteration <- iteration + 1
       
-      if (verbose) {messagef("Max diff: %s", round(diff, 2))}
+      if (verbose) {flog.info(">> max diff: %s", round(diff, 2), name = "stats.logger")}
       
       if (diff < 0.01) {break}
 
@@ -411,7 +427,8 @@ gamClustering <- function(E.prep,
     
     if (any(correlation.max > cor.threshold)) {
       
-      messagef("Max cor exceeded %s: %s", cor.threshold, round(max(correlation.max), 2))
+      flog.info(">> max cor exceeded %s: %s", cor.threshold, round(max(correlation.max), 2),
+                name = "stats.logger")
       max.cor.mod1 <- which.max(correlation.max) 
       max.cor.mod2 <- which.max(centers.cors[max.cor.mod1, ])
       cur.centers <- updCenters(cur.centers = cur.centers, 
@@ -443,7 +460,11 @@ gamClustering <- function(E.prep,
                                   E.prep = E.prep, ms_mods = ms_mods)
       } else {
         saveStats(work.dir, rev, gesecaRes, iter.stats)
-        messagef("No modules found. Try to tune method's parameters (check '/stats' folder for the statistics of the run).")
+        message.string <- "[Attention!] No modules found.\n
+          Try to tune method's parameters.\n
+          Check '/stats' folder for the statistics of the run."
+        flog.warn(message.string, name = "stats.logger")
+        warning(message.string, call. = FALSE)
         return()
       }
     }
@@ -477,6 +498,8 @@ gamClustering <- function(E.prep,
   gesecaRes$pathway <- paste0("m", 1:nrow(gesecaRes)) 
 
   saveStats(work.dir, rev, gesecaRes, iter.stats)
+  
+  flog.info("GAM-CLUSTERING ends here.", name = "stats.logger")
 
   return(list(
     modules = modules,

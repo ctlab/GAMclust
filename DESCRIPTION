@@ -51,6 +51,7 @@ Suggests:
     Rgraphviz,
     rsvg,
     testthat,
+    futile.logger,
     knitr
 License: MIT + file LICENSE
 Encoding: UTF-8
